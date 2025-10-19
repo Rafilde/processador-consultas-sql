@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processador de Consultas SQL - HU1</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                <span>🗄️</span>
+                Processador de Consultas SQL
+            </h1>
+            <p><strong>HU1</strong> - Entrada e Validação da Consulta</p>
+            <p style="margin-top: 10px; font-size: 0.95em;">Digite sua consulta SQL para validação de sintaxe, tabelas e atributos</p>
+        </div>
+
+        <!-- Main Panel -->
+        <div class="main-panel">
+            <div class="form-group">
+                <label for="sqlQuery">Consulta SQL:</label>
+                <textarea 
+                    id="sqlQuery" 
+                    class="sql-input" 
+                    placeholder="Exemplo: SELECT Cliente.Nome, Pedido.DataPedido FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente WHERE Cliente.Nome = 'João'"
+                ></textarea>
+            </div>
+            <button class="btn" onclick="validateQuery()">Validar Consulta</button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; color: white;">Validando consulta...</p>
+        </div>
+
+        <!-- Result Panel -->
+        <div id="resultPanel" class="result-panel">
+            <div id="resultHeader" class="result-header">
+                <span id="resultIcon" class="result-icon"></span>
+                <h2 id="resultTitle" class="result-title"></h2>
+            </div>
+            <div id="resultContent"></div>
+        </div>
+
+        <!-- Metadata Panel -->
+        <div class="metadata-panel">
+            <h2>📊 Tabelas Disponíveis no Modelo</h2>
+            <div id="tablesGrid" class="tables-grid"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
