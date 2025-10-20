@@ -11,13 +11,24 @@
     <header class="main-header">
         <div class="header-content">
             <div class="logo-section">
-                <span class="logo-icon">🗄️</span>
+                <img class="logo-icon"
+                     src="{{ url_for('static', filename='images/app_logo.png') }}" 
+                     alt="SQL Icon"
+                />
                 <div class="logo-text">
                     <h1>Processador de Consultas SQL</h1>
                     <span class="subtitle">Sistema de Validação de Queries</span>
                 </div>
             </div>
-            <div class="header-badge">HU1 - Validação</div>
+            
+            <a  href="https://www.unifor.br" target="_blank" rel="noopener noreferrer" class="header-badge">
+                <img src="{{ url_for('static', filename='images/unifor_logo.png') }}" 
+                    alt="UNIFOR" 
+                    class="unifor-logo"
+                >
+                    
+                <span>UNIFOR</span>
+            </a>
         </div>
     </header>
 
