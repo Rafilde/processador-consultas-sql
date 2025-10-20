@@ -1,0 +1,447 @@
+import unittest
+import sys
+import io
+from app import SQLValidator, METADATA
+from datetime import datetime
+
+class Colors:
+    """Códigos de cores ANSI para terminal"""
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+
+def print_header(text):
+    """Imprime cabeçalho estilizado"""
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{'=' * 70}{Colors.ENDC}")
+    print(f"{Colors.HEADER}{Colors.BOLD}{text:^70}{Colors.ENDC}")
+    print(f"{Colors.HEADER}{Colors.BOLD}{'=' * 70}{Colors.ENDC}\n")
+
+def print_section(text):
+    """Imprime seção estilizada"""
+    print(f"\n{Colors.OKCYAN}{Colors.BOLD}▶ {text}{Colors.ENDC}")
+    print(f"{Colors.OKCYAN}{'─' * 70}{Colors.ENDC}")
+
+class ColoredTextTestResult(unittest.TextTestResult):
+    """Resultado de teste customizado com cores e formatação"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.test_results = []
+        self.current_test_class = None
+        self.last_category = None
+        
+    def startTest(self, test):
+        """Inicia um teste e exibe cabeçalho da classe se necessário"""
+        super().startTest(test)
+        self.current_test_start = datetime.now()
+        
+        test_class = test.__class__.__name__
+        if test_class != self.current_test_class:
+            self.current_test_class = test_class
+            self._print_class_header(test_class)
+            self.last_category = None
+    
+    def _print_class_header(self, test_class):
+        """Imprime cabeçalho da classe de teste"""
+        headers = {
+            'TestSQLValidator': 'TESTES DO VALIDADOR SQL',
+            'TestMetadata': 'TESTES DE METADADOS'
+        }
+        
+        if test_class in headers:
+            title = headers[test_class]
+            padding = ' ' * (68 - len(title) - 2)
+            print(f"\n{Colors.OKBLUE}{'┌' + '─' * 68 + '┐'}{Colors.ENDC}")
+            print(f"{Colors.OKBLUE}│{Colors.BOLD}  {title}{padding}│{Colors.ENDC}")
+            print(f"{Colors.OKBLUE}{'└' + '─' * 68 + '┘'}{Colors.ENDC}\n")
+    
+    def _extract_category(self, description):
+        """Extrai a categoria da descrição (texto entre [])"""
+        if '[' in description and ']' in description:
+            start = description.find('[')
+            end = description.find(']')
+            return description[start+1:end]
+        return None
+    
+    def _print_category_separator(self, category):
+        """Imprime linha em branco ao mudar de categoria"""
+        if category and category != self.last_category:
+            if self.last_category is not None:
+                print()
+            self.last_category = category
+    
+    def _add_result(self, test, status, duration):
+        """Adiciona resultado e imprime linha formatada"""
+        description = test.shortDescription() or str(test)
+        category = self._extract_category(description)
+        self._print_category_separator(category)
+        
+        self.test_results.append({
+            'name': description,
+            'status': status,
+            'duration': duration
+        })
+        
+        symbols = {
+            'PASS': (f"{Colors.OKGREEN}✓{Colors.ENDC}", Colors.OKGREEN),
+            'FAIL': (f"{Colors.FAIL}✗{Colors.ENDC}", Colors.FAIL),
+            'ERROR': (f"{Colors.FAIL}✗{Colors.ENDC}", Colors.FAIL),
+            'SKIP': (f"{Colors.WARNING}⊘{Colors.ENDC}", Colors.WARNING)
+        }
+        
+        symbol, color = symbols.get(status, ('', ''))
+        status_text = f"[{status} - {duration:.3f}s]" if status != 'PASS' else f"[{duration:.3f}s]"
+        
+        print(f"  {symbol} {description:<65} {color}{status_text}{Colors.ENDC}")
+        
+    def addSuccess(self, test):
+        super().addSuccess(test)
+        duration = (datetime.now() - self.current_test_start).total_seconds()
+        self._add_result(test, 'PASS', duration)
+        
+    def addError(self, test, err):
+        super().addError(test, err)
+        duration = (datetime.now() - self.current_test_start).total_seconds()
+        self._add_result(test, 'ERROR', duration)
+        
+    def addFailure(self, test, err):
+        super().addFailure(test, err)
+        duration = (datetime.now() - self.current_test_start).total_seconds()
+        self._add_result(test, 'FAIL', duration)
+        
+    def addSkip(self, test, reason):
+        super().addSkip(test, reason)
+        duration = (datetime.now() - self.current_test_start).total_seconds()
+        self._add_result(test, 'SKIP', duration)
+
+class ColoredTextTestRunner(unittest.TextTestRunner):
+    """Runner customizado com cores"""
+    resultclass = ColoredTextTestResult
+    
+    def run(self, test):
+        """Executa os testes e exibe resultados"""
+        print_header("EXECUTANDO TESTES - VALIDADOR SQL")
+        
+        result = self.resultclass(io.StringIO(), self.descriptions, self.verbosity)
+        result.failfast = self.failfast
+        result.buffer = self.buffer
+        
+        test(result)
+        self._print_summary(result)
+        
+        return result
+    
+    def _print_summary(self, result):
+        """Imprime resumo dos testes"""
+        print_section("RESUMO DOS TESTES")
+        
+        total = result.testsRun
+        passed = total - len(result.failures) - len(result.errors)
+        failed = len(result.failures)
+        errors = len(result.errors)
+        skipped = len(result.skipped)
+        total_time = sum(r['duration'] for r in result.test_results)
+        
+        print(f"\n{Colors.BOLD}Estatísticas:{Colors.ENDC}")
+        print(f"  Total de testes:  {Colors.BOLD}{total}{Colors.ENDC}")
+        print(f"  {Colors.OKGREEN}✓ Aprovados:{Colors.ENDC}      {Colors.OKGREEN}{passed}{Colors.ENDC}")
+        
+        if failed > 0:
+            print(f"  {Colors.FAIL}✗ Falharam:{Colors.ENDC}       {Colors.FAIL}{failed}{Colors.ENDC}")
+        if errors > 0:
+            print(f"  {Colors.FAIL}✗ Erros:{Colors.ENDC}          {Colors.FAIL}{errors}{Colors.ENDC}")
+        if skipped > 0:
+            print(f"  {Colors.WARNING}⊘ Ignorados:{Colors.ENDC}      {Colors.WARNING}{skipped}{Colors.ENDC}")
+        
+        print(f"  {Colors.OKCYAN}⏱ Tempo total:{Colors.ENDC}    {Colors.OKCYAN}{total_time:.3f}s{Colors.ENDC}")
+        
+        print(f"\n{Colors.BOLD}{'─' * 70}{Colors.ENDC}")
+        if result.wasSuccessful():
+            print(f"{Colors.OKGREEN}{Colors.BOLD}✓ TODOS OS TESTES PASSARAM! 🎉{Colors.ENDC}")
+        else:
+            print(f"{Colors.FAIL}{Colors.BOLD}✗ ALGUNS TESTES FALHARAM{Colors.ENDC}")
+        print(f"{Colors.BOLD}{'─' * 70}{Colors.ENDC}\n")
+        
+        if failed > 0 or errors > 0:
+            self._print_failure_details(result)
+    
+    def _print_failure_details(self, result):
+        """Imprime detalhes das falhas e erros"""
+        print_section("DETALHES DAS FALHAS")
+        
+        for test, traceback in result.failures + result.errors:
+            print(f"\n{Colors.FAIL}✗ {test}{Colors.ENDC}")
+            print(f"{Colors.FAIL}{traceback}{Colors.ENDC}")
+
+class TestSQLValidator(unittest.TestCase):
+    """Testes unitários para o validador SQL - HU1"""
+    
+    def setUp(self):
+        """Configuração inicial para cada teste"""
+        self.validator = SQLValidator(METADATA)
+    
+    # ==================== SINTAXE BÁSICA ====================
+    
+    def test_01_consulta_valida_simples(self):
+        """[SINTAXE] Consulta SELECT simples válida"""
+        query = "SELECT * FROM Cliente"
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'])
+        self.assertEqual(len(result['errors']), 0)
+    
+    def test_02_consulta_sem_select(self):
+        """[SINTAXE] Consulta que não começa com SELECT"""
+        query = "FROM Cliente"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertIn('A consulta deve começar com SELECT', result['errors'])
+    
+    def test_03_consulta_sem_from(self):
+        """[SINTAXE] Consulta sem cláusula FROM"""
+        query = "SELECT Nome"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertIn('A consulta deve conter a cláusula FROM', result['errors'])
+    
+    def test_04_consulta_vazia(self):
+        """[SINTAXE] Consulta vazia"""
+        result = self.validator.validate("")
+        self.assertFalse(result['valid'])
+    
+    # ==================== NORMALIZAÇÃO ====================
+    
+    def test_05_normalizacao_espacos_extras(self):
+        """[NORMALIZAÇÃO] Remove espaços extras corretamente"""
+        query = "SELECT   *   FROM    Cliente"
+        result = self.validator.validate(query)
+        self.assertEqual(result['query'], "SELECT * FROM Cliente")
+    
+    def test_06_case_insensitive(self):
+        """[NORMALIZAÇÃO] Ignora maiúsculas/minúsculas"""
+        queries = ["SELECT * FROM Cliente", "select * from cliente", "SeLeCt * FrOm ClIeNtE"]
+        for query in queries:
+            result = self.validator.validate(query)
+            self.assertNotIn('A consulta deve começar com SELECT', result['errors'])
+    
+    # ==================== TABELAS ====================
+    
+    def test_07_tabela_existente(self):
+        """[TABELAS] Validação com tabela existente"""
+        query = "SELECT * FROM Cliente"
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'])
+        self.assertIn('Cliente', result['tables_found'])
+    
+    def test_08_tabela_inexistente(self):
+        """[TABELAS] Validação com tabela inexistente"""
+        query = "SELECT * FROM Funcionario"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('Funcionario' in error for error in result['errors']))
+    
+    def test_09_multiplas_tabelas_from(self):
+        """[TABELAS] Múltiplas tabelas na cláusula FROM"""
+        query = "SELECT * FROM Cliente, Pedido"
+        result = self.validator.validate(query)
+        self.assertIn('Cliente', result['tables_found'])
+        self.assertIn('Pedido', result['tables_found'])
+    
+    # ==================== ATRIBUTOS ====================
+    
+    def test_10_atributo_valido(self):
+        """[ATRIBUTOS] Atributo válido na tabela"""
+        query = "SELECT Cliente.Nome FROM Cliente"
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'])
+    
+    def test_11_atributo_invalido(self):
+        """[ATRIBUTOS] Atributo que não existe na tabela"""
+        query = "SELECT Cliente.CPF FROM Cliente"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('CPF' in error for error in result['errors']))
+    
+    def test_12_multiplos_atributos(self):
+        """[ATRIBUTOS] Múltiplos atributos no SELECT"""
+        query = "SELECT Cliente.Nome, Cliente.Email FROM Cliente"
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'])
+    
+    # ==================== WHERE ====================
+    
+    def test_13_where_com_operador_igual(self):
+        """[WHERE] WHERE com operador ="""
+        query = "SELECT * FROM Cliente WHERE Cliente.Nome = 'João'"
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'])
+    
+    def test_14_where_com_operadores_comparacao(self):
+        """[WHERE] WHERE com operadores de comparação"""
+        queries = [
+            "SELECT * FROM Produto WHERE Produto.Preco > 100",
+            "SELECT * FROM Produto WHERE Produto.Preco < 50",
+            "SELECT * FROM Produto WHERE Produto.Preco >= 100",
+            "SELECT * FROM Produto WHERE Produto.Preco <= 50",
+            "SELECT * FROM Produto WHERE Produto.Preco <> 0"
+        ]
+        for query in queries:
+            result = self.validator.validate(query)
+            self.assertTrue(result['valid'], f"Falhou para: {query}")
+    
+    def test_15_where_com_and(self):
+        """[WHERE] WHERE com operador AND"""
+        query = "SELECT * FROM Produto WHERE Produto.Preco > 100 AND Produto.QuantEstoque > 0"
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'])
+    
+    # ==================== JOIN ====================
+    
+    def test_16_join_simples(self):
+        """[JOIN] JOIN simples"""
+        query = """
+            SELECT Cliente.Nome, Pedido.DataPedido 
+            FROM Cliente 
+            JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente
+        """
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'])
+        self.assertIn('Cliente', result['tables_found'])
+        self.assertIn('Pedido', result['tables_found'])
+    
+    def test_17_multiplos_joins(self):
+        """[JOIN] Múltiplos JOINs"""
+        query = """
+            SELECT c.Nome, p.DataPedido, pr.Nome
+            FROM Cliente c
+            JOIN Pedido p ON c.idCliente = p.Cliente_idCliente
+            JOIN Pedido_has_Produto pp ON p.idPedido = pp.Pedido_idPedido
+            JOIN Produto pr ON pp.Produto_idProduto = pr.idProduto
+        """
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'])
+        self.assertEqual(len(result['tables_found']), 4)
+    
+    def test_18_join_tabela_inexistente(self):
+        """[JOIN] JOIN com tabela inexistente"""
+        query = """
+            SELECT * 
+            FROM Cliente 
+            JOIN Funcionario ON Cliente.idCliente = Funcionario.Cliente_id
+        """
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('Funcionario' in error for error in result['errors']))
+    
+    # ==================== PARÊNTESES ====================
+    
+    def test_19_parenteses_balanceados(self):
+        """[PARÊNTESES] Parênteses balanceados"""
+        query = "SELECT * FROM Cliente WHERE (Cliente.Nome = 'João' AND Cliente.Email = 'joao@email.com')"
+        result = self.validator.validate(query)
+        self.assertNotIn('Parênteses não estão balanceados', result['errors'])
+    
+    def test_20_parenteses_desbalanceados(self):
+        """[PARÊNTESES] Parênteses desbalanceados"""
+        queries = [
+            "SELECT * FROM Cliente WHERE (Cliente.Nome = 'João'",
+            "SELECT * FROM Cliente WHERE Cliente.Nome = 'João')",
+            "SELECT * FROM Cliente WHERE ((Cliente.Nome = 'João')"
+        ]
+        for query in queries:
+            result = self.validator.validate(query)
+            self.assertFalse(result['valid'])
+            self.assertIn('Parênteses não estão balanceados', result['errors'])
+    
+    # ==================== CASOS COMPLEXOS ====================
+    
+    def test_21_consulta_complexa_valida(self):
+        """[COMPLEXO] Consulta complexa e válida"""
+        query = """
+            SELECT c.Nome, c.Email, p.DataPedido, pr.Nome, pr.Preco
+            FROM Cliente c
+            JOIN Pedido p ON c.idCliente = p.Cliente_idCliente
+            JOIN Pedido_has_Produto pp ON p.idPedido = pp.Pedido_idPedido
+            JOIN Produto pr ON pp.Produto_idProduto = pr.idProduto
+            WHERE c.Nome = 'Maria' AND pr.Preco > 50
+        """
+        result = self.validator.validate(query)
+        self.assertTrue(result['valid'], f"Erros: {result['errors']}")
+    
+    def test_22_alias_em_tabelas(self):
+        """[COMPLEXO] Uso de alias em tabelas"""
+        query = "SELECT c.Nome FROM Cliente c"
+        result = self.validator.validate(query)
+        self.assertNotIn('A consulta deve conter a cláusula FROM', result['errors'])
+    
+    # ==================== EXTRAÇÃO ====================
+    
+    def test_23_extracao_tabelas(self):
+        """[EXTRAÇÃO] Extração correta de tabelas"""
+        query = "SELECT * FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente"
+        tables = self.validator.extract_tables(query)
+        self.assertIn('Cliente', tables)
+        self.assertIn('Pedido', tables)
+        self.assertEqual(len(tables), 2)
+    
+    def test_24_extracao_atributos_select(self):
+        """[EXTRAÇÃO] Extração de atributos do SELECT"""
+        query = "SELECT Cliente.Nome, Cliente.Email FROM Cliente"
+        attributes = self.validator.extract_attributes(query)
+        self.assertIn('Cliente.Nome', attributes)
+        self.assertIn('Cliente.Email', attributes)
+    
+    def test_25_extracao_atributos_where(self):
+        """[EXTRAÇÃO] Extração de atributos do WHERE"""
+        query = "SELECT * FROM Cliente WHERE Cliente.Nome = 'João'"
+        attributes = self.validator.extract_attributes(query)
+        self.assertIn('Cliente.Nome', attributes)
+
+class TestMetadata(unittest.TestCase):
+    """Testes para verificar integridade dos metadados"""
+    
+    def test_26_todas_tabelas_presentes(self):
+        """[METADATA] Todas as tabelas esperadas estão presentes"""
+        expected_tables = [
+            'Categoria', 'Produto', 'TipoCliente', 'Cliente',
+            'TipoEndereco', 'Endereco', 'Telefone', 'Status',
+            'Pedido', 'Pedido_has_Produto'
+        ]
+        for table in expected_tables:
+            self.assertIn(table, METADATA)
+    
+    def test_27_tabelas_tem_campos(self):
+        """[METADATA] Todas as tabelas têm campos definidos"""
+        for table, fields in METADATA.items():
+            self.assertIsInstance(fields, list)
+            self.assertGreater(len(fields), 0, f"Tabela {table} não tem campos")
+    
+    def test_28_cliente_campos_corretos(self):
+        """[METADATA] Cliente tem os campos corretos"""
+        expected_fields = [
+            'idCliente', 'Nome', 'Email', 'Nascimento', 
+            'Senha', 'TipoCliente_idTipoCliente', 'DataRegistro'
+        ]
+        for field in expected_fields:
+            self.assertIn(field, METADATA['Cliente'])
+
+def run_tests():
+    """Executa todos os testes"""
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    
+    suite.addTests(loader.loadTestsFromTestCase(TestSQLValidator))
+    suite.addTests(loader.loadTestsFromTestCase(TestMetadata))
+    
+    runner = ColoredTextTestRunner(verbosity=0)
+    result = runner.run(suite)
+    
+    return result.wasSuccessful()
+
+if __name__ == '__main__':
+    success = run_tests()
+    sys.exit(0 if success else 1)
