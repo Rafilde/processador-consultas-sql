@@ -1,7 +1,18 @@
 window.addEventListener('DOMContentLoaded', () => {
     loadMetadata();
     initializeSQLHighlighter();
+    initializeResultOutput();
 });
+
+// ==================== INITIALIZE RESULT OUTPUT ====================
+function initializeResultOutput() {
+    const mainPanel = document.querySelector('.main-panel');
+    const button = mainPanel.querySelector('.btn');
+    const resultOutput = document.createElement('div');
+    resultOutput.id = 'resultOutput';
+    resultOutput.className = 'result-output';
+    mainPanel.insertBefore(resultOutput, button);
+}
 
 // ==================== SQL SYNTAX HIGHLIGHTER ====================
 function initializeSQLHighlighter() {
@@ -233,16 +244,17 @@ async function loadMetadata() {
 // ==================== QUERY VALIDATOR ====================
 async function validateQuery() {
     const query = document.getElementById('sqlQuery').value;
-    const loading = document.getElementById('loading');
-    const resultPanel = document.getElementById('resultPanel');
+    const resultOutput = document.getElementById('resultOutput');
     
     if (!query.trim()) {
         alert('Por favor, digite uma consulta SQL');
         return;
     }
     
-    loading.classList.add('show');
-    resultPanel.classList.remove('show');
+    // Mostrar loading
+    resultOutput.classList.remove('show');
+    resultOutput.innerHTML = '<p class="loading-inline"><span class="spinner-inline"></span>Processando validação...</p>';
+    resultOutput.classList.add('show');
     
     try {
         const response = await fetch('/validate', {
@@ -254,100 +266,53 @@ async function validateQuery() {
         });
         
         const result = await response.json();
-        
-        loading.classList.remove('show');
         displayResult(result);
         
     } catch (error) {
-        loading.classList.remove('show');
-        alert('Erro ao validar consulta: ' + error.message);
+        resultOutput.innerHTML = '<div class="result-error"><p>Erro ao validar consulta</p><p>' + escapeHtml(error.message) + '</p></div>';
     }
 }
 
 function displayResult(result) {
-    const resultPanel = document.getElementById('resultPanel');
-    const resultHeader = document.getElementById('resultHeader');
-    const resultIcon = document.getElementById('resultIcon');
-    const resultTitle = document.getElementById('resultTitle');
-    const resultContent = document.getElementById('resultContent');
+    const resultOutput = document.getElementById('resultOutput');
 
-    resultContent.innerHTML = '';
+    resultOutput.innerHTML = '';
     
     if (result.valid) {
-        resultHeader.className = 'result-header valid';
-        resultIcon.textContent = '✓';
-        resultIcon.style.color = '#10b981';
-        resultTitle.textContent = 'Consulta Válida!';
-        resultTitle.style.color = '#047857';
+        detailsDiv.className = 'result-details';
         
-        const successBox = document.createElement('div');
-        successBox.className = 'success-box';
-        successBox.innerHTML = `
-            <h3>✓ A consulta passou em todas as validações</h3>
-            <ul>
-                <li>Sintaxe SQL válida</li>
-                <li>Comandos permitidos (SELECT, FROM, WHERE, JOIN, ON)</li>
-                <li>Tabelas existem no modelo</li>
-                <li>Atributos são válidos</li>
-                <li>Operadores permitidos (=, >, <, <=, >=, <>, AND)</li>
-                <li>Parênteses balanceados</li>
-            </ul>
-        `;
-        resultContent.appendChild(successBox);
+        let detailsHTML = '<p><strong>Query normalizada:</strong></p>';
+        detailsHTML += `<pre>${escapeHtml(result.query)}</pre>`;
         
         if (result.tables_found && result.tables_found.length > 0) {
-            const detailsDiv = document.createElement('div');
-            detailsDiv.className = 'details-box';
-            detailsDiv.innerHTML = `
-                <h3>Detalhes da Análise:</h3>
-                <p><strong>Consulta normalizada:</strong></p>
-                <pre>${escapeHtml(result.query)}</pre>
-                <p style="margin-top: 1rem;"><strong>Tabelas encontradas:</strong> ${result.tables_found.join(', ')}</p>
-            `;
-            resultContent.appendChild(detailsDiv);
+            detailsHTML += `<p><strong>Tabelas detectadas:</strong> ${result.tables_found.join(', ')}</p>`;
         }
+        
+        if (result.attributes_found && result.attributes_found.length > 0) {
+            detailsHTML += `<p><strong>Atributos detectados:</strong> ${result.attributes_found.join(', ')}</p>`;
+        }
+        
+        detailsDiv.innerHTML = detailsHTML;
+        resultOutput.appendChild(detailsDiv);
         
     } else {
-        resultHeader.className = 'result-header invalid';
-        resultIcon.textContent = '✗';
-        resultIcon.style.color = '#ef4444';
-        resultTitle.textContent = 'Consulta Inválida';
-        resultTitle.style.color = '#dc2626';
+        // Erro
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'result-error';
+        
+        let errorHTML = '<p>Erros encontrados:</p>';
         
         if (result.errors && result.errors.length > 0) {
-            const errorBox = document.createElement('div');
-            errorBox.className = 'error-box';
-            
-            const errorTitle = document.createElement('h3');
-            errorTitle.textContent = '✗ Erros encontrados:';
-            errorBox.appendChild(errorTitle);
-            
-            const errorList = document.createElement('ul');
-            errorList.className = 'error-list';
-            
             result.errors.forEach(error => {
-                const li = document.createElement('li');
-                li.textContent = error;
-                errorList.appendChild(li);
+                errorHTML += `<p>${escapeHtml(error)}</p>`;
             });
-            
-            errorBox.appendChild(errorList);
-            resultContent.appendChild(errorBox);
         }
         
-        if (result.query) {
-            const detailsDiv = document.createElement('div');
-            detailsDiv.className = 'details-box';
-            detailsDiv.innerHTML = `
-                <h3>Consulta Analisada:</h3>
-                <pre>${escapeHtml(result.query)}</pre>
-            `;
-            resultContent.appendChild(detailsDiv);
-        }
+        errorDiv.innerHTML = errorHTML;
+        resultOutput.appendChild(errorDiv);
     }
 
-    resultPanel.classList.add('show');
-    resultPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    resultOutput.classList.add('show');
 }
 
 // ==================== KEYBOARD SHORTCUTS ====================
