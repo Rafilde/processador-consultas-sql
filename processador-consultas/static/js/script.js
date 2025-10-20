@@ -7,11 +7,11 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==================== INITIALIZE RESULT OUTPUT ====================
 function initializeResultOutput() {
     const mainPanel = document.querySelector('.main-panel');
-    const button = mainPanel.querySelector('.btn');
+    const buttonContainer = mainPanel.querySelector('.btn-container');
     const resultOutput = document.createElement('div');
     resultOutput.id = 'resultOutput';
     resultOutput.className = 'result-output';
-    mainPanel.insertBefore(resultOutput, button);
+    mainPanel.insertBefore(resultOutput, buttonContainer);
 }
 
 // ==================== SQL SYNTAX HIGHLIGHTER ====================
@@ -279,6 +279,7 @@ function displayResult(result) {
     resultOutput.innerHTML = '';
     
     if (result.valid) {
+        const detailsDiv = document.createElement('div');
         detailsDiv.className = 'result-details';
         
         let detailsHTML = '<p><strong>Query normalizada:</strong></p>';
@@ -327,3 +328,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ==================== TOGGLE METADATA ====================
+function toggleMetadata() {
+    const metadataPanel = document.getElementById('metadataPanel');
+    const button = document.querySelector('.btn-secondary');
+    
+    // Verificar se está visível pelo display style
+    const isVisible = metadataPanel.style.display !== 'none';
+    
+    if (isVisible) {
+        metadataPanel.style.display = 'none';
+        metadataPanel.classList.remove('show');
+        button.textContent = 'Ver Tabelas';
+    } else {
+        metadataPanel.style.display = 'block';
+        metadataPanel.classList.add('show');
+        button.textContent = 'Ocultar Tabelas';
+        
+        // Scroll suave até as tabelas
+        setTimeout(() => {
+            metadataPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+}

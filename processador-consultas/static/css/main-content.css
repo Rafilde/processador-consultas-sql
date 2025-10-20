@@ -158,6 +158,13 @@
     background-color: #0a0f1e;
 }
 
+/* Button Container */
+.btn-container {
+    display: flex;
+    gap: 1rem;
+    margin: 0 2rem 1.5rem 2rem;
+}
+
 /* Button - Terminal Style */
 .btn {
     background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-dark) 100%);
@@ -168,7 +175,7 @@
     font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
-    width: 100%;
+    flex: 1;
     transition: all 0.3s ease;
     box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
     font-family: 'Fira Code', 'Courier New', monospace;
@@ -176,8 +183,6 @@
     letter-spacing: 1px;
     position: relative;
     overflow: hidden;
-    margin: 0 2rem 1.5rem 2rem;
-    width: calc(100% - 4rem);
 }
 
 .btn::before {
@@ -216,6 +221,17 @@
 
 .btn:active {
     transform: translateY(0);
+}
+
+/* Button Secondary - Para mostrar tabelas */
+.btn-secondary {
+    background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+    box-shadow: 0 4px 6px rgba(100, 116, 139, 0.2);
+}
+
+.btn-secondary:hover {
+    background: linear-gradient(135deg, #475569 0%, #334155 100%);
+    box-shadow: 0 6px 12px rgba(100, 116, 139, 0.3);
 }
 
 /* Terminal Scanline Effect (sutil) */
@@ -346,6 +362,12 @@
     border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     margin-bottom: 2rem;
+    display: none;
+}
+
+.metadata-panel.show {
+    display: block;
+    animation: slideIn 0.3s ease-out;
 }
 
 .metadata-panel h2 {
