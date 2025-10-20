@@ -1,0 +1,61 @@
+.main-header {
+    background: linear-gradient(135deg, var(--dark-bg) 0%, var(--medium-dark) 100%);
+    color: var(--white);
+    padding: 1.5rem 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.logo-icon {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.5));
+}
+
+.logo-text h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 0.2rem;
+}
+
+.logo-text .subtitle {
+    font-size: 0.875rem;
+    color: var(--gray-light);
+    font-weight: 400;
+}
+
+.header-badge {
+    background: var(--primary-blue);
+    color: var(--white);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+}
