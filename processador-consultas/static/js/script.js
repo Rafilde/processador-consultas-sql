@@ -58,7 +58,6 @@ async function validateQuery() {
         const result = await response.json();
         
         loading.classList.remove('show');
-
         displayResult(result);
         
     } catch (error) {
@@ -100,12 +99,12 @@ function displayResult(result) {
         
         if (result.tables_found && result.tables_found.length > 0) {
             const detailsDiv = document.createElement('div');
-            detailsDiv.style.marginTop = '20px';
+            detailsDiv.className = 'details-box';
             detailsDiv.innerHTML = `
-                <h3 style="color: #333; margin-bottom: 10px;">Detalhes da Análise:</h3>
-                <p style="color: #666;"><strong>Consulta normalizada:</strong></p>
-                <pre style="background: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0;">${result.query}</pre>
-                <p style="color: #666; margin-top: 15px;"><strong>Tabelas encontradas:</strong> ${result.tables_found.join(', ')}</p>
+                <h3>Detalhes da Análise:</h3>
+                <p><strong>Consulta normalizada:</strong></p>
+                <pre>${result.query}</pre>
+                <p style="margin-top: 1rem;"><strong>Tabelas encontradas:</strong> ${result.tables_found.join(', ')}</p>
             `;
             resultContent.appendChild(detailsDiv);
         }
@@ -139,18 +138,17 @@ function displayResult(result) {
         }
         
         if (result.query) {
-            const queryDiv = document.createElement('div');
-            queryDiv.style.marginTop = '20px';
-            queryDiv.innerHTML = `
-                <h3 style="color: #333; margin-bottom: 10px;">Consulta Analisada:</h3>
-                <pre style="background: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto;">${result.query}</pre>
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'details-box';
+            detailsDiv.innerHTML = `
+                <h3>Consulta Analisada:</h3>
+                <pre>${result.query}</pre>
             `;
-            resultContent.appendChild(queryDiv);
+            resultContent.appendChild(detailsDiv);
         }
     }
 
     resultPanel.classList.add('show');
-    
     resultPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
