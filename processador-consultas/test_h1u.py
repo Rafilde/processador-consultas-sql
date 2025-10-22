@@ -219,7 +219,7 @@ class TestSQLValidator(unittest.TestCase):
         """[NORMALIZAÇÃO] Remove espaços extras corretamente"""
         query = "SELECT   *   FROM    Cliente"
         result = self.validator.validate(query)
-        self.assertEqual(result['query'], "SELECT * FROM Cliente")
+        self.assertEqual(result['query'], "select * from cliente")
     
     def test_06_case_insensitive(self):
         """[NORMALIZAÇÃO] Ignora maiúsculas/minúsculas"""
@@ -235,21 +235,21 @@ class TestSQLValidator(unittest.TestCase):
         query = "SELECT * FROM Cliente"
         result = self.validator.validate(query)
         self.assertTrue(result['valid'])
-        self.assertIn('Cliente', result['tables_found'])
+        self.assertIn('cliente', result['tables_found'])
     
     def test_08_tabela_inexistente(self):
         """[TABELAS] Validação com tabela inexistente"""
         query = "SELECT * FROM Funcionario"
         result = self.validator.validate(query)
         self.assertFalse(result['valid'])
-        self.assertTrue(any('Funcionario' in error for error in result['errors']))
+        self.assertTrue(any('funcionario' in error.lower() for error in result['errors']))
     
     def test_09_multiplas_tabelas_from(self):
         """[TABELAS] Múltiplas tabelas na cláusula FROM"""
         query = "SELECT * FROM Cliente, Pedido"
         result = self.validator.validate(query)
-        self.assertIn('Cliente', result['tables_found'])
-        self.assertIn('Pedido', result['tables_found'])
+        self.assertIn('cliente', result['tables_found'])
+        self.assertIn('pedido', result['tables_found'])
     
     # ==================== ATRIBUTOS ====================
     
@@ -264,7 +264,7 @@ class TestSQLValidator(unittest.TestCase):
         query = "SELECT Cliente.CPF FROM Cliente"
         result = self.validator.validate(query)
         self.assertFalse(result['valid'])
-        self.assertTrue(any('CPF' in error for error in result['errors']))
+        self.assertTrue(any('cpf' in error.lower() for error in result['errors']))
     
     def test_12_multiplos_atributos(self):
         """[ATRIBUTOS] Múltiplos atributos no SELECT"""
@@ -310,8 +310,8 @@ class TestSQLValidator(unittest.TestCase):
         """
         result = self.validator.validate(query)
         self.assertTrue(result['valid'])
-        self.assertIn('Cliente', result['tables_found'])
-        self.assertIn('Pedido', result['tables_found'])
+        self.assertIn('cliente', result['tables_found'])
+        self.assertIn('pedido', result['tables_found'])
     
     def test_17_multiplos_joins(self):
         """[JOIN] Múltiplos JOINs"""
@@ -335,7 +335,7 @@ class TestSQLValidator(unittest.TestCase):
         """
         result = self.validator.validate(query)
         self.assertFalse(result['valid'])
-        self.assertTrue(any('Funcionario' in error for error in result['errors']))
+        self.assertTrue(any('funcionario' in error.lower() for error in result['errors']))
     
     # ==================== PARÊNTESES ====================
     
@@ -383,23 +383,25 @@ class TestSQLValidator(unittest.TestCase):
     def test_23_extracao_tabelas(self):
         """[EXTRAÇÃO] Extração correta de tabelas"""
         query = "SELECT * FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente"
-        tables = self.validator.extract_tables(query)
-        self.assertIn('Cliente', tables)
-        self.assertIn('Pedido', tables)
+        tables = self.validator.extract_tables(query.lower())
+        self.assertIn('cliente', tables)
+        self.assertIn('pedido', tables)
         self.assertEqual(len(tables), 2)
     
     def test_24_extracao_atributos_select(self):
         """[EXTRAÇÃO] Extração de atributos do SELECT"""
         query = "SELECT Cliente.Nome, Cliente.Email FROM Cliente"
-        attributes = self.validator.extract_attributes(query)
-        self.assertIn('Cliente.Nome', attributes)
-        self.assertIn('Cliente.Email', attributes)
+        normalized = self.validator.normalize_query(query)
+        attributes = self.validator.extract_attributes(normalized)
+        self.assertIn('cliente.nome', attributes)
+        self.assertIn('cliente.email', attributes)
     
     def test_25_extracao_atributos_where(self):
         """[EXTRAÇÃO] Extração de atributos do WHERE"""
         query = "SELECT * FROM Cliente WHERE Cliente.Nome = 'João'"
-        attributes = self.validator.extract_attributes(query)
-        self.assertIn('Cliente.Nome', attributes)
+        normalized = self.validator.normalize_query(query)
+        attributes = self.validator.extract_attributes(normalized)
+        self.assertIn('cliente.nome', attributes)
 
 class TestMetadata(unittest.TestCase):
     """Testes para verificar integridade dos metadados"""
@@ -407,9 +409,9 @@ class TestMetadata(unittest.TestCase):
     def test_26_todas_tabelas_presentes(self):
         """[METADATA] Todas as tabelas esperadas estão presentes"""
         expected_tables = [
-            'Categoria', 'Produto', 'TipoCliente', 'Cliente',
-            'TipoEndereco', 'Endereco', 'Telefone', 'Status',
-            'Pedido', 'Pedido_has_Produto'
+            'categoria', 'produto', 'tipocliente', 'cliente',
+            'tipoendereco', 'endereco', 'telefone', 'status',
+            'pedido', 'pedido_has_produto'
         ]
         for table in expected_tables:
             self.assertIn(table, METADATA)
@@ -423,11 +425,11 @@ class TestMetadata(unittest.TestCase):
     def test_28_cliente_campos_corretos(self):
         """[METADATA] Cliente tem os campos corretos"""
         expected_fields = [
-            'idCliente', 'Nome', 'Email', 'Nascimento', 
-            'Senha', 'TipoCliente_idTipoCliente', 'DataRegistro'
+            'idcliente', 'nome', 'email', 'nascimento', 
+            'senha', 'tipocliente_idtipocliente', 'dataregistro'
         ]
         for field in expected_fields:
-            self.assertIn(field, METADATA['Cliente'])
+            self.assertIn(field, METADATA['cliente'])
 
 def run_tests():
     """Executa todos os testes"""

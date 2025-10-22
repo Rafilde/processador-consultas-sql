@@ -4,18 +4,18 @@ import re
 app = Flask(__name__)
 
 METADATA = {
-    'Categoria': ['idCategoria', 'Descricao'],
-    'Produto': ['idProduto', 'Nome', 'Descricao', 'Preco', 'QuantEstoque', 'Categoria_idCategoria'],
-    'TipoCliente': ['idTipoCliente', 'Descricao'],
-    'Cliente': ['idCliente', 'Nome', 'Email', 'Nascimento', 'Senha', 'TipoCliente_idTipoCliente', 'DataRegistro'],
-    'TipoEndereco': ['idTipoEndereco', 'Descricao'],
-    'Endereco': ['idEndereco', 'EnderecoPadrao', 'Logradouro', 'Numero', 'Complemento', 'Bairro', 
-                 'Cidade', 'UF', 'CEP', 'TipoEndereco_idTipoEndereco', 'Cliente_idCliente'],
-    'Telefone': ['Numero', 'Cliente_idCliente'],
-    'Status': ['idStatus', 'Descricao'],
-    'Pedido': ['idPedido', 'Status_idStatus', 'DataPedido', 'ValorTotalPedido', 'Cliente_idCliente'],
-    'Pedido_has_Produto': ['idPedidoProduto', 'Pedido_idPedido', 'Produto_idProduto', 
-                           'Quantidade', 'PrecoUnitario']
+    'categoria': ['idcategoria', 'descricao'],
+    'produto': ['idproduto', 'nome', 'descricao', 'preco', 'quantestoque', 'categoria_idcategoria'],
+    'tipocliente': ['idtipocliente', 'descricao'],
+    'cliente': ['idcliente', 'nome', 'email', 'nascimento', 'senha', 'tipocliente_idtipocliente', 'dataregistro'],
+    'tipoendereco': ['idtipoendereco', 'descricao'],
+    'endereco': ['idendereco', 'enderecopadrao', 'logradouro', 'numero', 'complemento', 'bairro', 
+                 'cidade', 'uf', 'cep', 'tipoendereco_idtipoendereco', 'cliente_idcliente'],
+    'telefone': ['numero', 'cliente_idcliente'],
+    'status': ['idstatus', 'descricao'],
+    'pedido': ['idpedido', 'status_idstatus', 'datapedido', 'valortotalpedido', 'cliente_idcliente'],
+    'pedido_has_produto': ['idpedidoproduto', 'pedido_idpedido', 'produto_idproduto', 
+                           'quantidade', 'precounitario']
 }
 
 class SQLValidator:
@@ -23,26 +23,25 @@ class SQLValidator:
     
     def __init__(self, metadata):
         self.metadata = metadata
-        self.valid_keywords = ['SELECT', 'FROM', 'WHERE', 'JOIN', 'ON', 'AND', 'OR']
+        self.valid_keywords = ['select', 'from', 'where', 'join', 'on', 'and', 'or']
         self.valid_operators = ['=', '>', '<', '<=', '>=', '<>']
         self.table_aliases = {}
         
     def normalize_query(self, query):
-        """Remove espaços extras e normaliza a query"""
+        """Remove espaços extras, normaliza e converte tudo para minúsculas"""
         query = re.sub(r'\s+', ' ', query.strip())
+        query = query.lower()
         return query
     
     def validate_syntax(self, query):
         """Valida a sintaxe básica da consulta SQL"""
         errors = []
         warnings = []
-        
-        query_upper = query.upper()
-        
-        if not query_upper.startswith('SELECT'):
+
+        if not query.startswith('select'):
             errors.append('A consulta deve começar com SELECT')
             
-        if 'FROM' not in query_upper:
+        if 'from' not in query:
             errors.append('A consulta deve conter a cláusula FROM')
 
         if query.count('(') != query.count(')'):
@@ -61,7 +60,7 @@ class SQLValidator:
         
         # Extrair tabelas do FROM - suporta alias
         # Padrão: FROM Tabela [alias] ou FROM Tabela alias
-        from_pattern = r'FROM\s+([\w\s,]+?)(?:\s+WHERE|\s+JOIN|$)'
+        from_pattern = r'from\s+([\w\s,]+?)(?:\s+where|\s+join|$)'
         from_match = re.search(from_pattern, query, re.IGNORECASE)
         
         if from_match:
@@ -81,7 +80,7 @@ class SQLValidator:
         
         # Extrair tabelas dos JOINs - suporta alias
         # Padrão: JOIN Tabela [alias] ON
-        join_pattern = r'JOIN\s+([\w]+)(?:\s+(\w+))?\s+ON'
+        join_pattern = r'join\s+([\w]+)(?:\s+(\w+))?\s+on'
         join_matches = re.finditer(join_pattern, query, re.IGNORECASE)
         
         for match in join_matches:
@@ -107,19 +106,19 @@ class SQLValidator:
         """Extrai os atributos da cláusula SELECT e WHERE"""
         attributes = []
         
-        select_pattern = r'SELECT\s+(.*?)\s+FROM'
+        select_pattern = r'select\s+(.*?)\s+from'
         select_match = re.search(select_pattern, query, re.IGNORECASE)
         
         if select_match:
             select_clause = select_match.group(1)
             if select_clause.strip() != '*':
                 for attr in select_clause.split(','):
-                    attr = re.sub(r'\s+AS\s+\w+', '', attr, flags=re.IGNORECASE)
+                    attr = re.sub(r'\s+as\s+\w+', '', attr, flags=re.IGNORECASE)
                     attr = attr.strip()
                     if '.' in attr:
                         attributes.append(attr)
         
-        where_pattern = r'WHERE\s+(.*?)(?:$|\s+ORDER|\s+GROUP)'
+        where_pattern = r'where\s+(.*?)(?:$|\s+order|\s+group)'
         where_match = re.search(where_pattern, query, re.IGNORECASE)
         
         if where_match:
@@ -129,7 +128,7 @@ class SQLValidator:
             for match in attr_matches:
                 attributes.append(match.group(1))
         
-        on_pattern = r'ON\s+([\w.]+)\s*=\s*([\w.]+)'
+        on_pattern = r'on\s+([\w.]+)\s*=\s*([\w.]+)'
         on_matches = re.finditer(on_pattern, query, re.IGNORECASE)
         
         for match in on_matches:
@@ -165,12 +164,12 @@ class SQLValidator:
         """Valida se os operadores são válidos"""
         errors = []
         
-        operator_pattern = r'[=<>!]+|AND|OR'
+        operator_pattern = r'[=<>!]+|and|or'
         operators = re.findall(operator_pattern, query, re.IGNORECASE)
         
         for op in operators:
-            op_upper = op.upper()
-            if op_upper not in self.valid_operators and op_upper not in ['AND', 'OR']:
+            op_lower = op.lower()
+            if op_lower not in self.valid_operators and op_lower not in ['and', 'or']:
                 if op not in self.valid_operators:
                     errors.append(f"Operador '{op}' não é válido")
                     
