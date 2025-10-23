@@ -357,9 +357,143 @@ class TestSQLValidator(unittest.TestCase):
             self.assertFalse(result['valid'])
             self.assertIn('Parênteses não estão balanceados', result['errors'])
     
+    # ==================== VALIDAÇÃO AVANÇADA DE SINTAXE ====================
+    
+    def test_21_join_sem_on(self):
+        """[SINTAXE AVANÇADA] JOIN sem cláusula ON"""
+        query = "SELECT * FROM Cliente JOIN Pedido WHERE Cliente.Nome = 'João'"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('join' in error.lower() and 'on' in error.lower() for error in result['errors']))
+    
+    def test_22_on_sem_join(self):
+        """[SINTAXE AVANÇADA] ON sem JOIN"""
+        query = "SELECT * FROM Cliente ON Cliente.idCliente = 1"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('on' in error.lower() for error in result['errors']))
+    
+    def test_23_and_no_final_where(self):
+        """[SINTAXE AVANÇADA] AND no final da cláusula WHERE"""
+        query = "SELECT * FROM Cliente WHERE Cliente.Nome = 'João' AND"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('and' in error.lower() or 'or' in error.lower() for error in result['errors']))
+    
+    def test_24_or_no_final_where(self):
+        """[SINTAXE AVANÇADA] OR no final da cláusula WHERE"""
+        query = "SELECT * FROM Cliente WHERE Cliente.Email = 'test@email.com' OR"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('and' in error.lower() or 'or' in error.lower() for error in result['errors']))
+    
+    def test_25_and_no_inicio_where(self):
+        """[SINTAXE AVANÇADA] AND no início da cláusula WHERE"""
+        query = "SELECT * FROM Cliente WHERE AND Cliente.Nome = 'João'"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('and' in error.lower() or 'or' in error.lower() for error in result['errors']))
+    
+    def test_26_operadores_logicos_consecutivos(self):
+        """[SINTAXE AVANÇADA] Operadores lógicos consecutivos"""
+        queries = [
+            "SELECT * FROM Cliente WHERE Cliente.Nome = 'João' AND AND Cliente.Email = 'joao@email.com'",
+            "SELECT * FROM Cliente WHERE Cliente.Nome = 'João' OR OR Cliente.Email = 'joao@email.com'",
+            "SELECT * FROM Cliente WHERE Cliente.Nome = 'João' AND OR Cliente.Email = 'joao@email.com'"
+        ]
+        for query in queries:
+            result = self.validator.validate(query)
+            self.assertFalse(result['valid'], f"Deveria falhar para: {query}")
+            self.assertTrue(any('consecutivos' in error.lower() or 'operador' in error.lower() for error in result['errors']))
+    
+    def test_27_where_sem_comparacao(self):
+        """[SINTAXE AVANÇADA] WHERE sem operador de comparação"""
+        query = "SELECT * FROM Cliente WHERE Cliente.Nome"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('comparação' in error.lower() for error in result['errors']))
+    
+    def test_28_operador_incompleto(self):
+        """[SINTAXE AVANÇADA] Operador de comparação incompleto"""
+        query = "SELECT * FROM Cliente WHERE Cliente.idCliente ="
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('incompleto' in error.lower() for error in result['errors']))
+    
+    def test_29_consulta_complexa_com_erro_and(self):
+        """[SINTAXE AVANÇADA] Consulta complexa sem AND"""
+        query = """
+            SELECT cliente.nome, pedido.idPedido, pedido.DataPedido, pedido.ValorTotalPedido
+            FROM Cliente JOIN pedido ON cliente.idcliente = pedido.Cliente_idCliente
+            WHERE cliente.TipoCliente_idTipoCliente = 1 pedido.ValorTotalPedido = 0
+        """
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        # Deve detectar que faltam operadores lógicos entre as condições
+    
+    def test_30_join_multiplos_sem_on(self):
+        """[SINTAXE AVANÇADA] Múltiplos JOINs com ON faltando"""
+        query = """
+            SELECT * FROM Cliente 
+            JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente
+            JOIN Produto
+        """
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('join' in error.lower() and 'on' in error.lower() for error in result['errors']))
+    
+    def test_31_where_sem_operador_igual(self):
+        """[VALIDAÇÃO DETALHADA] WHERE sem operador = """
+        query = "SELECT * FROM Cliente WHERE Cliente.idCliente 1"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('comparação' in error.lower() for error in result['errors']))
+    
+    def test_32_where_operador_sem_valor(self):
+        """[VALIDAÇÃO DETALHADA] WHERE com operador mas sem valor"""
+        query = "SELECT * FROM Cliente WHERE Cliente.idCliente ="
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('incompleta' in error.lower() or 'valor' in error.lower() for error in result['errors']))
+    
+    def test_33_where_operador_sem_atributo(self):
+        """[VALIDAÇÃO DETALHADA] WHERE com operador mas sem atributo"""
+        query = "SELECT * FROM Cliente WHERE = 1"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('atributo' in error.lower() or 'esquerda' in error.lower() for error in result['errors']))
+    
+    def test_34_on_sem_operador(self):
+        """[VALIDAÇÃO DETALHADA] ON sem operador de comparação"""
+        query = "SELECT * FROM Cliente JOIN Pedido ON Cliente.idCliente Pedido.Cliente_idCliente"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('on' in error.lower() and 'operador' in error.lower() for error in result['errors']))
+    
+    def test_35_on_operador_sem_valor(self):
+        """[VALIDAÇÃO DETALHADA] ON com operador mas sem valor"""
+        query = "SELECT * FROM Cliente JOIN Pedido ON Cliente.idCliente = WHERE Cliente.Nome = 'João'"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('on' in error.lower() and ('incompleta' in error.lower() or 'direita' in error.lower()) for error in result['errors']))
+    
+    def test_36_multiplas_condicoes_where_incompletas(self):
+        """[VALIDAÇÃO DETALHADA] Múltiplas condições WHERE com erros"""
+        query = "SELECT * FROM Cliente WHERE idCliente = 1 AND Nome"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        self.assertTrue(any('comparação' in error.lower() for error in result['errors']))
+    
+    def test_37_where_com_comparacao_malformada(self):
+        """[VALIDAÇÃO DETALHADA] WHERE com comparação malformada"""
+        query = "SELECT * FROM Cliente WHERE Cliente.idCliente 1 AND Cliente.Nome = 'João'"
+        result = self.validator.validate(query)
+        self.assertFalse(result['valid'])
+        # Deve detectar condição sem operador ou malformada
+    
     # ==================== CASOS COMPLEXOS ====================
     
-    def test_21_consulta_complexa_valida(self):
+    def test_38_consulta_complexa_valida(self):
         """[COMPLEXO] Consulta complexa e válida"""
         query = """
             SELECT c.Nome, c.Email, p.DataPedido, pr.Nome, pr.Preco
@@ -372,7 +506,7 @@ class TestSQLValidator(unittest.TestCase):
         result = self.validator.validate(query)
         self.assertTrue(result['valid'], f"Erros: {result['errors']}")
     
-    def test_22_alias_em_tabelas(self):
+    def test_39_alias_em_tabelas(self):
         """[COMPLEXO] Uso de alias em tabelas"""
         query = "SELECT c.Nome FROM Cliente c"
         result = self.validator.validate(query)
@@ -380,7 +514,7 @@ class TestSQLValidator(unittest.TestCase):
     
     # ==================== EXTRAÇÃO ====================
     
-    def test_23_extracao_tabelas(self):
+    def test_40_extracao_tabelas(self):
         """[EXTRAÇÃO] Extração correta de tabelas"""
         query = "SELECT * FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente"
         tables = self.validator.extract_tables(query.lower())
@@ -388,7 +522,7 @@ class TestSQLValidator(unittest.TestCase):
         self.assertIn('pedido', tables)
         self.assertEqual(len(tables), 2)
     
-    def test_24_extracao_atributos_select(self):
+    def test_41_extracao_atributos_select(self):
         """[EXTRAÇÃO] Extração de atributos do SELECT"""
         query = "SELECT Cliente.Nome, Cliente.Email FROM Cliente"
         normalized = self.validator.normalize_query(query)
@@ -396,7 +530,7 @@ class TestSQLValidator(unittest.TestCase):
         self.assertIn('cliente.nome', attributes)
         self.assertIn('cliente.email', attributes)
     
-    def test_25_extracao_atributos_where(self):
+    def test_42_extracao_atributos_where(self):
         """[EXTRAÇÃO] Extração de atributos do WHERE"""
         query = "SELECT * FROM Cliente WHERE Cliente.Nome = 'João'"
         normalized = self.validator.normalize_query(query)
@@ -406,7 +540,7 @@ class TestSQLValidator(unittest.TestCase):
 class TestMetadata(unittest.TestCase):
     """Testes para verificar integridade dos metadados"""
     
-    def test_26_todas_tabelas_presentes(self):
+    def test_43_todas_tabelas_presentes(self):
         """[METADATA] Todas as tabelas esperadas estão presentes"""
         expected_tables = [
             'categoria', 'produto', 'tipocliente', 'cliente',
@@ -416,13 +550,13 @@ class TestMetadata(unittest.TestCase):
         for table in expected_tables:
             self.assertIn(table, METADATA)
     
-    def test_27_tabelas_tem_campos(self):
-        """[METADATA] Todas as tabelas têm campos definidos"""
+    def test_44_tabelas_tem_campos(self):
+        """[METADATA] Todas as tabelas têm campos definidas"""
         for table, fields in METADATA.items():
             self.assertIsInstance(fields, list)
             self.assertGreater(len(fields), 0, f"Tabela {table} não tem campos")
     
-    def test_28_cliente_campos_corretos(self):
+    def test_45_cliente_campos_corretos(self):
         """[METADATA] Cliente tem os campos corretos"""
         expected_fields = [
             'idcliente', 'nome', 'email', 'nascimento', 
