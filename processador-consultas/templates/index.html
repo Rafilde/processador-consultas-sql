@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processador de Consultas SQL - HU1</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="logo-section">
+                <img class="logo-icon"
+                     src="{{ url_for('static', filename='images/app_logo.png') }}" 
+                     alt="SQL Icon"
+                />
+                <div class="logo-text">
+                    <h1>Processador de Consultas SQL</h1>
+                    <span class="subtitle">Sistema de Validação de Queries</span>
+                </div>
+            </div>
+            
+            <a  href="https://www.unifor.br" target="_blank" rel="noopener noreferrer" class="header-badge">
+                <img src="{{ url_for('static', filename='images/unifor_logo.png') }}" 
+                    alt="UNIFOR" 
+                    class="unifor-logo"
+                >
+                    
+                <span>UNIFOR</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container">      
+        <div id="metadataPanel" class="metadata-panel" style="display: none;">
+            <h2>📊 Esquema do Banco de Dados</h2>
+            <div id="tablesGrid" class="tables-grid"></div>
+        </div>
+
+        <div class="main-panel">
+            <div class="form-group">
+                <label for="sqlQuery">SQL Terminal</label>
+                <textarea 
+                    id="sqlQuery" 
+                    class="sql-input" 
+                    placeholder="Exemplo: SELECT Cliente.Nome, Pedido.DataPedido FROM Cliente JOIN Pedido ON Cliente.idCliente = Pedido.Cliente_idCliente WHERE Cliente.Nome = 'João'"
+                    spellcheck="false"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                ></textarea>
+            </div>
+            <div class="btn-container">
+                <button class="btn btn-secondary" onclick="toggleMetadata()">Ver Tabelas</button>
+                <button class="btn" onclick="validateQuery()">Executar Validação (Ctrl+Enter)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-grid">
+                <div class="footer-section tech-section">
+                    <h3>🎯 Escopo do Trabalho</h3>
+                    <p>
+                        <strong>Histórias de Usuário implementadas:</strong><br>
+                        • HU1 - Validação de consultas SQL<br>
+                        • HU2 - Conversão para álgebra relacional<br>
+                        • HU3 - Grafo de operadores<br>
+                        • HU4 - Otimização com heurísticas<br>
+                        • HU5 - Plano de execução
+                    </p>
+                </div>
+                
+                <div class="footer-section">
+                    <h3>🛠️ Stack</h3>
+                    <div class="tech-stack-grid">
+                        <a href="https://docs.python.org/3.14/" target="_blank" rel="noopener noreferrer" class="tech-card">
+                            <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" alt="Python">
+                            <span>Python</span>
+                        </a>
+                        
+                        <a href="https://flask.palletsprojects.com/en/stable/" target="_blank" rel="noopener noreferrer" class="tech-card">
+                            <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/flask/flask-original.svg" alt="Flask">
+                            <span>Flask</span>
+                        </a>
+                        
+                        <a href="https://developer.mozilla.org/pt-BR/docs/Web/JavaScript" target="_blank" rel="noopener noreferrer" class="tech-card">
+                            <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg" alt="JavaScript">
+                            <span>JavaScript</span>
+                        </a>
+                        
+                        <a href="https://developer.mozilla.org/pt-BR/docs/Web/CSS" target="_blank" rel="noopener noreferrer" class="tech-card">
+                            <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/css3/css3-original.svg" alt="CSS3">
+                            <span>CSS3</span>
+                        </a>
+                        
+                        <a href="https://developer.mozilla.org/pt-BR/docs/Web/HTML" target="_blank" rel="noopener noreferrer" class="tech-card">
+                            <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/html5/html5-original.svg" alt="HTML5">
+                            <span>HTML5</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <div class="footer-copyright">
+                    <p>© 2025 Processador de Consultas SQL</p>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/Rafilde/processador-consultas-sql" target="_blank" rel="noopener noreferrer" class="github-link">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                        </svg>
+                        Repositório GitHub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/sql_highlighter.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/metadata_ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/query_validator.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
