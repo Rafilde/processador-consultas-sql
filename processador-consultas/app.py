@@ -46,8 +46,164 @@ class SQLValidator:
 
         if query.count('(') != query.count(')'):
             errors.append('Parênteses não estão balanceados')
+
+        # Verificação dos JOINs
+        if 'join' in query:
+            join_count = len(re.findall(r'\bjoin\b', query))
+            on_count = len(re.findall(r'\bon\b', query))
+            
+            if join_count > on_count:
+                errors.append('Toda cláusula JOIN deve ter uma condição ON correspondente')
+            elif on_count > join_count:
+                errors.append('Cláusula ON encontrada sem JOIN correspondente')
+            
+            # Verificar se ON vem depois de JOIN
+            join_positions = [m.start() for m in re.finditer(r'\bjoin\b', query)]
+            on_positions = [m.start() for m in re.finditer(r'\bon\b', query)]
+            
+            for join_pos in join_positions:
+                # Deve haver pelo menos um ON depois deste JOIN
+                if not any(on_pos > join_pos for on_pos in on_positions):
+                    errors.append('JOIN sem condição ON subsequente')
+        elif re.search(r'\bon\b', query) and not re.search(r'\bjoin\b', query):
+            errors.append('Cláusula ON encontrada sem JOIN correspondente')
+        
+        # Validar operadores lógicos no WHERE
+        if 'where' in query:
+            where_clause = self._extract_where_clause(query)
+            if where_clause:
+                # Verificar AND/OR isolados ou no início/fim
+                if re.search(r'\b(and|or)\s*$', where_clause, re.IGNORECASE):
+                    errors.append('Operador lógico (AND/OR) incompleto no final da cláusula WHERE')
+                
+                if re.search(r'^\s*(and|or)\b', where_clause, re.IGNORECASE):
+                    errors.append('Operador lógico (AND/OR) no início da cláusula WHERE')
+                
+                # Verificar operadores lógicos duplicados (AND AND, OR OR, AND OR AND, etc)
+                if re.search(r'\b(and|or)\s+(and|or)\b', where_clause, re.IGNORECASE):
+                    errors.append('Operadores lógicos (AND/OR) consecutivos sem condição entre eles')
+                
+                # Verificar se há operadores de comparação válidos
+                if not re.search(r'[=<>]|<=|>=|<>', where_clause):
+                    errors.append('Cláusula WHERE sem operador de comparação válido')
+                
+                # Verificar se há múltiplas condições sem operadores lógicos
+                # Exemplo: "campo1 = 1 campo2 = 2" (faltando AND/OR)
+                comparison_count = len(re.findall(r'\w+\s*[=<>]+\s*[\w\'\"]+', where_clause))
+                logical_ops_count = len(re.findall(r'\b(and|or)\b', where_clause, re.IGNORECASE))
+                
+                # Se tem mais de uma comparação, deve ter pelo menos (n-1) operadores lógicos
+                if comparison_count > 1 and logical_ops_count < comparison_count - 1:
+                    errors.append('Múltiplas condições no WHERE sem operadores lógicos (AND/OR) entre elas')
+                
+                # Validar cada condição individualmente
+                self._validate_where_conditions(where_clause, errors)
+        
+        # Validar condições no ON (para JOINs)
+        if 'on' in query and 'join' in query:
+            on_clauses = self._extract_on_clauses(query)
+            for on_clause in on_clauses:
+                self._validate_on_condition(on_clause, errors)
+        
+        # Validar operadores de comparação completos
+        # Procurar por operadores seguidos de ponto-e-vírgula ou fim sem valor
+        if re.search(r'[=<>]\s*;?\s*$', query):
+            errors.append('Operador de comparação incompleto (sem valor após o operador)')
+        
+        # Verificar se há múltiplos operadores de comparação juntos
+        if re.search(r'[=<>]{3,}', query):
+            errors.append('Operadores de comparação inválidos ou repetidos')
             
         return errors, warnings
+    
+    def _extract_where_clause(self, query):
+        """Extrai a cláusula WHERE da query"""
+        where_match = re.search(r'where\s+(.+?)(?:$|;)', query, re.IGNORECASE)
+        if where_match:
+            return where_match.group(1).strip()
+        return None
+    
+    def _validate_where_conditions(self, where_clause, errors):
+        """Valida as condições individuais no WHERE"""
+        # Remover parênteses para facilitar análise
+        where_clean = re.sub(r'[()]', ' ', where_clause)
+        
+        # Dividir por AND e OR para pegar cada condição
+        conditions = re.split(r'\b(and|or)\b', where_clean, flags=re.IGNORECASE)
+        
+        for i, part in enumerate(conditions):
+            part = part.strip()
+            # Pular os próprios operadores AND/OR
+            if part.lower() in ['and', 'or', '']:
+                continue
+            
+            # Verificar se a condição tem um operador de comparação
+            has_operator = re.search(r'[=<>]|<=|>=|<>', part)
+            
+            if has_operator:
+                # Verificar se há algo antes e depois do operador
+                # Padrão esperado: atributo operador valor
+                # Exemplo: cliente.nome = 'joão' ou idcliente > 1
+                
+                # Verificar operador sem valor à direita
+                if re.search(r'[=<>]+\s*$', part):
+                    errors.append(f"Condição incompleta: operador sem valor à direita")
+                    continue
+                
+                # Verificar operador sem atributo à esquerda  
+                if re.search(r'^\s*[=<>]', part):
+                    errors.append(f"Condição incompleta: operador sem atributo à esquerda")
+                    continue
+                
+                # Verificar padrão completo: algo operador algo
+                # Deve ter pelo menos: palavra/ponto operador palavra/número/string
+                pattern = r'[\w.]+\s*(?:=|<>|<=|>=|<|>)\s*[\w.\'\"-]+'
+                if not re.search(pattern, part):
+                    # Pode ser que tenha operador mas falta valor ou atributo
+                    if '=' in part or '<' in part or '>' in part:
+                        errors.append(f"Condição malformada no WHERE")
+            else:
+                # Condição sem operador de comparação
+                # Pode ser um erro, a menos que seja uma subcondição válida
+                if part and not part.isspace():
+                    # Verificar se não é apenas espaços em branco
+                    if len(part.strip()) > 0:
+                        errors.append(f"Condição sem operador de comparação no WHERE")
+    
+    def _validate_on_condition(self, on_clause, errors):
+        """Valida a condição de um JOIN ON"""
+        on_clause = on_clause.strip()
+        
+        if not on_clause:
+            return
+        
+        # Deve ter um operador de comparação (geralmente =)
+        if not re.search(r'[=<>]|<=|>=|<>', on_clause):
+            errors.append(f"Cláusula ON sem operador de comparação")
+            return
+        
+        # Verificar operador sem valor à direita
+        if re.search(r'[=<>]+\s*$', on_clause):
+            errors.append(f"Cláusula ON incompleta: operador sem valor à direita")
+            return
+        
+        # Verificar operador sem atributo à esquerda
+        if re.search(r'^\s*[=<>]', on_clause):
+            errors.append(f"Cláusula ON incompleta: operador sem atributo à esquerda")
+            return
+        
+        # Verificar padrão completo: tabela.campo = tabela.campo
+        if not re.search(r'[\w.]+\s*=\s*[\w.]+', on_clause):
+            errors.append(f"Cláusula ON malformada")
+    
+    def _extract_on_clauses(self, query):
+        """Extrai todas as cláusulas ON da query"""
+        on_clauses = []
+        # Padrão: ON ... (até encontrar WHERE, outro JOIN, ou fim)
+        on_matches = re.finditer(r'on\s+(.+?)(?:\s+where|\s+join|$)', query, re.IGNORECASE)
+        for match in on_matches:
+            on_clauses.append(match.group(1).strip())
+        return on_clauses
     
     def extract_tables(self, query):
         """Extrai as tabelas da consulta (FROM e JOIN) - mantido para compatibilidade"""
