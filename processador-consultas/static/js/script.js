@@ -219,12 +219,16 @@ async function loadMetadata() {
         tablesGrid.innerHTML = '';
         
         for (const [tableName, fields] of Object.entries(metadata)) {
-            const tableCard = document.createElement('div');
-            tableCard.className = 'table-card';
             
-            const title = document.createElement('h3');
-            title.textContent = tableName;
-            tableCard.appendChild(title);
+            const header = document.createElement('button');
+            header.className = 'table-card-header';
+            header.innerHTML = `<span>${tableName.toUpperCase()}</span><span class="expander">▶</span>`;
+            header.setAttribute('aria-expanded', 'false');
+            header.setAttribute('aria-controls', `content-${tableName}`);
+            
+            const content = document.createElement('div');
+            content.className = 'table-card-content';
+            content.id = `content-${tableName}`;
             
             const fieldList = document.createElement('ul');
             fields.forEach(field => {
@@ -233,11 +237,42 @@ async function loadMetadata() {
                 fieldList.appendChild(li);
             });
             
-            tableCard.appendChild(fieldList);
-            tablesGrid.appendChild(tableCard);
+            content.appendChild(fieldList);
+            
+            header.addEventListener('click', () => toggleAccordion(header, content));
+            
+            tablesGrid.appendChild(header);
+            tablesGrid.appendChild(content);
         }
+        
     } catch (error) {
         console.error('Erro ao carregar metadados:', error);
+        const metadataPanel = document.getElementById('metadataPanel');
+        metadataPanel.innerHTML = '<p style="color: #ef4444; padding: 1rem;">Erro ao carregar o esquema do banco de dados. Tente recarregar a página.</p>';
+        metadataPanel.style.display = 'block';
+    }
+}
+
+// ==================== LÓGICA DO ViSUALIZADOR DA TABELA  ====================
+function toggleAccordion(header, content) {
+    document.querySelectorAll('.table-card-header.expanded').forEach(h => {
+        if (h !== header) {
+            h.classList.remove('expanded');
+            h.setAttribute('aria-expanded', 'false');
+            document.getElementById(h.getAttribute('aria-controls')).style.maxHeight = '0';
+        }
+    });
+
+    const isExpanded = header.classList.contains('expanded');
+    
+    if (isExpanded) {
+        header.classList.remove('expanded');
+        header.setAttribute('aria-expanded', 'false');
+        content.style.maxHeight = '0';
+    } else {
+        header.classList.add('expanded');
+        header.setAttribute('aria-expanded', 'true');
+        content.style.maxHeight = content.scrollHeight + 'px';
     }
 }
 
@@ -251,7 +286,6 @@ async function validateQuery() {
         return;
     }
     
-    // Mostrar loading
     resultOutput.classList.remove('show');
     resultOutput.innerHTML = '<p class="loading-inline"><span class="spinner-inline"></span>Processando validação...</p>';
     resultOutput.classList.add('show');
@@ -297,7 +331,6 @@ function displayResult(result) {
         resultOutput.appendChild(detailsDiv);
         
     } else {
-        // Erro
         const errorDiv = document.createElement('div');
         errorDiv.className = 'result-error';
         
@@ -333,22 +366,23 @@ document.addEventListener('DOMContentLoaded', () => {
 function toggleMetadata() {
     const metadataPanel = document.getElementById('metadataPanel');
     const button = document.querySelector('.btn-secondary');
-    
-    // Verificar se está visível pelo display style
     const isVisible = metadataPanel.style.display !== 'none';
     
     if (isVisible) {
-        metadataPanel.style.display = 'none';
         metadataPanel.classList.remove('show');
+        setTimeout(() => {
+            metadataPanel.style.display = 'none';
+        }, 300); 
         button.textContent = 'Ver Tabelas';
     } else {
         metadataPanel.style.display = 'block';
-        metadataPanel.classList.add('show');
+        setTimeout(() => {
+            metadataPanel.classList.add('show');
+        }, 10); 
         button.textContent = 'Ocultar Tabelas';
         
-        // Scroll suave até as tabelas
         setTimeout(() => {
             metadataPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
+        }, 310);
     }
 }

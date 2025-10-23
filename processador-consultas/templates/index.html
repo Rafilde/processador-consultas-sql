@@ -33,8 +33,12 @@
     </header>
 
     <!-- Main Content -->
-    <div class="container">
-        <!-- Main Panel -->
+    <div class="container">      
+        <div id="metadataPanel" class="metadata-panel" style="display: none;">
+            <h2>📊 Esquema do Banco de Dados</h2>
+            <div id="tablesGrid" class="tables-grid"></div>
+        </div>
+
         <div class="main-panel">
             <div class="form-group">
                 <label for="sqlQuery">SQL Terminal</label>
@@ -50,14 +54,8 @@
             </div>
             <div class="btn-container">
                 <button class="btn btn-secondary" onclick="toggleMetadata()">Ver Tabelas</button>
-                <button class="btn" onclick="validateQuery()">Executar Validação</button>
+                <button class="btn" onclick="validateQuery()">Executar Validação (Ctrl+Enter)</button>
             </div>
-        </div>
-
-        <!-- Metadata Panel -->
-        <div id="metadataPanel" class="metadata-panel" style="display: none;">
-            <h2>📊 Tabelas Disponíveis no Modelo</h2>
-            <div id="tablesGrid" class="tables-grid"></div>
         </div>
     </div>
 

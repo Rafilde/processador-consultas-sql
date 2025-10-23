@@ -167,17 +167,14 @@
 
 /* Button - Terminal Style */
 .btn {
-    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-dark) 100%);
-    color: var(--white);
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 8px;
-    font-size: 0.875rem;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
     flex: 1;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
     font-family: 'Fira Code', 'Courier New', monospace;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -185,18 +182,24 @@
     overflow: hidden;
 }
 
-.btn::before {
+.btn:not(.btn-secondary) {
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-dark) 100%);
+    color: var(--white);
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+}
+
+.btn:not(.btn-secondary)::before {
     content: '▶';
     margin-right: 0.5rem;
     display: inline-block;
     transition: transform 0.3s ease;
 }
 
-.btn:hover::before {
+.btn:not(.btn-secondary):hover::before {
     transform: translateX(3px);
 }
 
-.btn::after {
+.btn:not(.btn-secondary)::after {
     content: '';
     position: absolute;
     top: 50%;
@@ -209,29 +212,36 @@
     transition: width 0.6s, height 0.6s;
 }
 
-.btn:hover::after {
+.btn:not(.btn-secondary):hover::after {
     width: 300px;
     height: 300px;
 }
 
-.btn:hover {
+.btn:not(.btn-secondary):hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
 }
 
-.btn:active {
+.btn:not(.btn-secondary):active {
     transform: translateY(0);
 }
 
 /* Button Secondary */
 .btn-secondary {
-    background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+    background: linear-gradient(135deg, var(--gray-medium) 0%, var(--gray-dark) 100%);
     box-shadow: 0 4px 6px rgba(100, 116, 139, 0.2);
+    color: var(--white);
+    font-size: 0.875rem; 
 }
 
 .btn-secondary:hover {
-    background: linear-gradient(135deg, #475569 0%, #334155 100%);
+    background: linear-gradient(135deg, var(--gray-dark) 0%, #1e293b 100%);
     box-shadow: 0 6px 12px rgba(100, 116, 139, 0.3);
+    transform: translateY(-2px);
+}
+
+.btn-secondary:active {
+    transform: translateY(0);
 }
 
 /* Terminal Scanline Effect (sutil) */
@@ -357,74 +367,107 @@
 
 /* ==================== METADATA PANEL ==================== */
 .metadata-panel {
-    background: var(--white);
-    padding: 2rem;
+    background: var(--medium-dark);
+    padding: 1.5rem;
     border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
-    display: none;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    margin-bottom: 1.5rem; 
+    border: 1px solid var(--gray-dark);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
 .metadata-panel.show {
-    display: block;
-    animation: slideIn 0.3s ease-out;
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .metadata-panel h2 {
-    color: var(--dark-bg);
-    margin-bottom: 1.5rem;
-    font-size: 1.5rem;
+    color: var(--white);
+    margin-bottom: 1rem;
+    font-size: 1.3rem; 
     font-weight: 700;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    padding-bottom: 0.75rem;
 }
 
 .tables-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.5rem;
+    display: block; 
+    gap: 1rem; 
 }
 
-.table-card {
-    border: 2px solid var(--gray-light);
-    border-radius: 8px;
-    padding: 1.5rem;
-    transition: all 0.3s ease;
-    background: var(--gray-lighter);
+.table-card-header {
+    background: #1e293b;
+    color: #60a5fa;
+    padding: 0.75rem 1rem;
+    margin-bottom: 5px;
+    border: 1px solid var(--gray-dark);
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s ease;
+    width: 100%;
+    text-align: left;
 }
 
-.table-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(37, 99, 235, 0.15);
-    border-color: var(--primary-blue);
-    background: var(--white);
+.table-card-header:hover {
+    background: #182230; 
 }
 
-.table-card h3 {
-    color: var(--primary-blue);
-    margin-bottom: 1rem;
-    font-size: 1.2rem;
-    font-weight: 700;
+.table-card-header .expander {
+    transition: transform 0.3s ease;
+    font-size: 0.8rem;
+    color: #34d399; 
+    margin-left: 10px;
 }
 
-.table-card ul {
+.table-card-header.expanded .expander {
+    transform: rotate(90deg);
+}
+
+.table-card-content {
+    max-height: 0; 
+    overflow: hidden;
+    transition: max-height 0.4s ease-out; 
+    background: #101925;
+    border: 1px solid var(--gray-dark);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    margin-top: -5px; 
+    padding: 0 1rem; 
+}
+
+.table-card-content ul {
     list-style: none;
+    padding: 0.5rem 0; 
 }
 
-.table-card li {
-    padding: 0.4rem 0;
-    color: var(--gray-dark);
-    font-size: 0.875rem;
+.table-card-content li {
+    padding: 0.4rem 0; 
+    color: var(--gray-light); 
+    font-size: 0.85rem; 
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    border-bottom: 1px dashed rgba(51, 65, 85, 0.3);
 }
 
-.table-card li::before {
-    content: "•";
-    color: var(--primary-blue);
-    font-size: 1.2rem;
+.table-card-content li:last-child {
+    border-bottom: none;
+}
+
+.table-card-content li::before {
+    content: "•"; 
+    color: #34d399; 
+    font-size: 1rem;
     font-weight: bold;
 }
 
@@ -433,10 +476,6 @@
     .container {
         padding: 0 1rem;
         margin: 1rem auto;
-    }
-
-    .tables-grid {
-        grid-template-columns: 1fr;
     }
     
     .sql-input {
