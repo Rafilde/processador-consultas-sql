@@ -59,6 +59,11 @@ function displayResult(result) {
         if (result.attributes_found && result.attributes_found.length > 0) {
             detailsHTML += `<p><strong>Atributos detectados:</strong> ${result.attributes_found.join(', ')}</p>`;
         }
+
+        if (result.relational_algebra) {
+            detailsHTML += '<p><strong>Álgebra Relacional (HU2):</strong></p>';
+            detailsHTML += `<pre>${escape(result.relational_algebra)}</pre>`;
+        }
         
         detailsDiv.innerHTML = detailsHTML;
         resultOutput.appendChild(detailsDiv);
