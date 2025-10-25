@@ -61,7 +61,7 @@ function displayResult(result) {
         }
 
         if (result.relational_algebra) {
-            detailsHTML += '<p><strong>Álgebra Relacional (HU2):</strong></p>';
+            detailsHTML += '<p><strong>Conversão para Álgebra Relacional:</strong></p>';
             detailsHTML += `<pre>${escape(result.relational_algebra)}</pre>`;
         }
         
