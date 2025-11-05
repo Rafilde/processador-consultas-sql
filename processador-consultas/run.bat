@@ -3,7 +3,7 @@ chcp 65001 >nul
 cls
 
 echo ======================================
-echo Processador de Consultas SQL - HU1
+echo Processador de Consultas SQL - HU1/HU2
 echo ======================================
 echo.
 
@@ -43,7 +43,7 @@ set /p run_tests="Deseja executar os testes? (s/N): "
 if /i "%run_tests%"=="s" (
     echo.
     echo 🧪 Executando testes...
-    python test_h1u.py
+    python run_tests.py
     echo.
 )
 

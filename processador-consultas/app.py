@@ -365,7 +365,7 @@ class SQLValidator:
         op_errors = self.validate_operators(normalized_query)
         all_errors.extend(op_errors)
         
-        return {
+        result = {
             'valid': len(all_errors) == 0,
             'errors': all_errors,
             'warnings': all_warnings,
@@ -374,6 +374,152 @@ class SQLValidator:
             'attributes_found': attributes,
             'aliases': self.table_aliases
         }
+
+        # HU2 – Conversão para Álgebra Relacional (apenas se válido)
+        if len(all_errors) == 0:
+            try:
+                result['relational_algebra'] = to_relational_algebra(
+                    normalized_query,
+                    aliases=self.table_aliases
+                )
+            except Exception:
+                # Em caso de erro inesperado na conversão, não bloquear a validação HU1
+                result['relational_algebra'] = None
+
+        return result
+
+
+def to_relational_algebra(normalized_query: str, aliases: dict | None = None) -> str:
+    """
+    Converte um subconjunto de SQL (SELECT, FROM, WHERE, JOIN ... ON) em Álgebra Relacional.
+
+    Regras:
+    - Projeção: π_{attrs}
+    - Seleção:  σ_{pred}
+    - Junção:   (A ⋈_{pred} B) encadeada à esquerda
+    - Produto cartesiano para múltiplas tabelas no FROM separadas por vírgula: ×
+    - Mantém parênteses e substitui AND/OR por ∧/∨
+    - Usa alias quando existir; caso contrário, nome da tabela
+    """
+    if aliases is None:
+        aliases = {}
+
+    q = normalized_query.strip().rstrip(';')
+
+    # 1) SELECT list
+    # Seleção até o próximo marcador (from/where/join) para evitar capturar palavras-chave
+    sel_match = re.search(r'^select\s+(.*?)(?=\s+(?:from|where|join)\b|$)', q, re.IGNORECASE)
+    select_list = sel_match.group(1).strip() if sel_match else '*'
+    # remove aliases "as x"
+    select_items = []
+    if select_list == '*':
+        projection = 'π{*}'
+    else:
+        for part in select_list.split(','):
+            # remove "as alias" e espaços
+            cleaned = re.sub(r'\s+as\s+\w+', '', part, flags=re.IGNORECASE).strip()
+            select_items.append(cleaned)
+        projection = f"π{{{', '.join(select_items)}}}"
+
+    # 2) FROM base relations and comma-joins
+    from_match = re.search(r'from\s+(.+?)(?:\s+where|\s+join|$)', q, re.IGNORECASE)
+    from_section = from_match.group(1).strip() if from_match else ''
+    from_tables = [p.strip() for p in from_section.split(',') if p.strip()]
+
+    def rel_name(token: str) -> str:
+        parts = token.split()
+        if len(parts) >= 2:
+            return parts[1]  # alias
+        return parts[0]     # table
+
+    # expressão base: produto cartesiano se houver vírgulas (formato encadeado esquerda)
+    base_expr = ''
+    if from_tables:
+        base_terms = [rel_name(t) for t in from_tables]
+        if len(base_terms) == 1:
+            base_expr = base_terms[0]
+        else:
+            # ((a×b)×c)... sem espaços
+            expr = f"({base_terms[0]}×{base_terms[1]})"
+            for term in base_terms[2:]:
+                expr = f"({expr}×{term})"
+            base_expr = expr
+
+    # 3) JOIN chains (left-deep)
+    # Padrão: JOIN <table> [alias] ON <predicate> (até where/outro join/fim)
+    join_iter = re.finditer(r'\bjoin\s+(\w+)(?:\s+(\w+))?\s+on\s+(.+?)(?=\s+join|\s+where|$)', q, re.IGNORECASE)
+    current_expr = base_expr
+    for m in join_iter:
+        table = m.group(1)
+        alias = m.group(2)
+        on_pred = m.group(3).strip()
+        right_rel = alias if alias else table
+        # normalizar e reformatar condição do ON (remover espaços ao redor dos operadores)
+        on_pred = re.sub(r'\s+', ' ', on_pred)
+        on_pred = _format_predicate(on_pred)
+        # sem espaços ao redor de ⋈ e dentro das chaves
+        current_expr = f"({current_expr}⋈{{{on_pred}}}{right_rel})" if current_expr else f"({right_rel})"
+
+    if current_expr:
+        join_expr = current_expr
+    else:
+        join_expr = base_expr
+
+    # 4) WHERE → seleção
+    # WHERE até o próximo marcador (from/join/group/order/limit) ou fim
+    where_match = re.search(r'\bwhere\s+(.+?)(?=\s+(?:from|join|group|order|limit)\b|$)', q, re.IGNORECASE)
+    selection = None
+    if where_match:
+        where_pred = where_match.group(1).strip()
+        # cortar qualquer coisa após where que não seja parte dele (por segurança)
+        where_pred = re.split(r'\s+group\s+by|\s+order\s+by|\s+limit\s+', where_pred)[0]
+        where_pred = re.sub(r'\s+', ' ', where_pred)
+        where_pred = _format_predicate(where_pred)
+        selection = f"σ{{{where_pred}}}"
+
+    # 5) Montagem final: π (σ (joins/base))
+    inner = join_expr if join_expr else base_expr
+    if not inner:
+        inner = ''
+
+    if selection:
+        inner = f"{selection}({inner})"
+
+    if projection:
+        final_expr = f"{projection}({inner})" if inner else f"{projection}()"
+    else:
+        final_expr = inner
+
+    return final_expr.strip()
+
+
+def _format_predicate(pred: str) -> str:
+    """Reformata predicados: AND/OR → ∧/∨, >= → ≥, <= → ≤, remove espaços ao redor de operadores.
+    Mantém um único espaço ao redor de ∧ e ∨.
+    """
+    # Operadores lógicos
+    pred = re.sub(r'\band\b', '∧', pred, flags=re.IGNORECASE)
+    pred = re.sub(r'\bor\b', '∨', pred, flags=re.IGNORECASE)
+    # Normalizar espaços
+    pred = re.sub(r'\s+', ' ', pred).strip()
+    # Substituições de operadores compostos primeiro
+    pred = pred.replace('>=', '≥').replace('<=', '≤')
+    # Remover espaços ao redor de operadores de comparação (=, <, >, ≥, ≤, <>)
+    # padrões com espaço opcional antes/depois do operador
+    def tighten(op_regex: str, symbol: str):
+        nonlocal pred
+        pred = re.sub(rf'\s*{op_regex}\s*', symbol, pred)
+
+    tighten(r'<>', '<>')
+    tighten(r'≥', '≥')
+    tighten(r'≤', '≤')
+    tighten(r'=', '=')
+    tighten(r'>', '>')
+    tighten(r'<', '<')
+    # Espaços ao redor de ∧ e ∨: exatamente um
+    pred = re.sub(r'\s*∧\s*', ' ∧ ', pred)
+    pred = re.sub(r'\s*∨\s*', ' ∨ ', pred)
+    return pred
 
 @app.route('/')
 def index():
