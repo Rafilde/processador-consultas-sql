@@ -1,0 +1,243 @@
+/* graph.css - Estilos para o Grafo de Operadores (HU3) */
+
+.graph-section {
+    margin-top: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.graph-section h3 {
+    color: white;
+    margin: 0 0 20px 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.graph-container {
+    width: 100%;
+    height: 600px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Modal para detalhes do nó */
+.node-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.node-modal-content {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    margin: 5% auto;
+    padding: 30px;
+    border: none;
+    border-radius: 15px;
+    width: 80%;
+    max-width: 600px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideDown 0.3s ease;
+    position: relative;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.node-modal-close {
+    color: #aaa;
+    float: right;
+    font-size: 32px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: absolute;
+    right: 20px;
+    top: 15px;
+}
+
+.node-modal-close:hover,
+.node-modal-close:focus {
+    color: #ff4444;
+    transform: rotate(90deg);
+}
+
+.node-modal-content h2 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 1.8rem;
+    font-weight: 600;
+    padding-bottom: 15px;
+    border-bottom: 3px solid #667eea;
+}
+
+.node-details-content {
+    margin-top: 20px;
+}
+
+.node-details-content ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.node-details-content li {
+    padding: 12px 15px;
+    margin: 8px 0;
+    background: white;
+    border-left: 4px solid #667eea;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+}
+
+.node-details-content li:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.node-details-content strong {
+    color: #667eea;
+    font-weight: 600;
+    margin-right: 10px;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .graph-container {
+        height: 400px;
+    }
+    
+    .node-modal-content {
+        width: 95%;
+        margin: 10% auto;
+        padding: 20px;
+    }
+    
+    .node-modal-content h2 {
+        font-size: 1.4rem;
+    }
+}
+
+/* Loading state */
+.graph-container.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.graph-container.loading::after {
+    content: "Carregando grafo...";
+    font-size: 1.2rem;
+    color: #667eea;
+    font-weight: 600;
+}
+
+/* Toolbar do grafo */
+.graph-toolbar {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    display: flex;
+    gap: 10px;
+}
+
+.graph-toolbar button {
+    background: white;
+    border: 2px solid #667eea;
+    border-radius: 5px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #667eea;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.graph-toolbar button:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Legenda do grafo */
+.graph-legend {
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.legend-color {
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.legend-color.scan {
+    background: #4CAF50;
+}
+
+.legend-color.projection {
+    background: #2196F3;
+}
+
+.legend-color.selection {
+    background: #FF9800;
+}
+
+.legend-color.join {
+    background: #9C27B0;
+}
+
+.legend-color.cross {
+    background: #F44336;
+}

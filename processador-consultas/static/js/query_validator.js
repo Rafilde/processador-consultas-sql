@@ -68,6 +68,21 @@ function displayResult(result) {
         detailsDiv.innerHTML = detailsHTML;
         resultOutput.appendChild(detailsDiv);
         
+        // HU3: Renderizar Grafo de Operadores
+        if (result.operator_graph) {
+            const graphSection = document.createElement('div');
+            graphSection.className = 'graph-section';
+            graphSection.innerHTML = '<h3>📊 Grafo de Operadores (HU3)</h3>';
+            resultOutput.appendChild(graphSection);
+            
+            // Renderizar o grafo usando Vis.js
+            if (typeof window.renderOperatorGraph === 'function') {
+                window.renderOperatorGraph(result.operator_graph);
+            } else {
+                graphSection.innerHTML += '<p class="error">Erro: Visualizador de grafo não carregado</p>';
+            }
+        }
+        
     } else {
         const errorDiv = document.createElement('div');
         errorDiv.className = 'result-error';

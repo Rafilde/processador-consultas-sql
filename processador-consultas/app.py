@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import re
+import json
 
 app = Flask(__name__)
 
@@ -385,6 +386,17 @@ class SQLValidator:
             except Exception:
                 # Em caso de erro inesperado na conversão, não bloquear a validação HU1
                 result['relational_algebra'] = None
+            
+            # HU3 – Construção do Grafo de Operadores (apenas se válido)
+            try:
+                graph_builder = OperatorGraph()
+                result['operator_graph'] = graph_builder.build_from_query(
+                    normalized_query,
+                    aliases=self.table_aliases
+                )
+            except Exception:
+                # Em caso de erro inesperado na construção do grafo, não bloquear
+                result['operator_graph'] = None
 
         return result
 
@@ -520,6 +532,168 @@ def _format_predicate(pred: str) -> str:
     pred = re.sub(r'\s*∧\s*', ' ∧ ', pred)
     pred = re.sub(r'\s*∨\s*', ' ∨ ', pred)
     return pred
+
+
+class OperatorGraph:
+    """Construtor de Grafo de Operadores para HU3"""
+    
+    def __init__(self):
+        self.node_id = 0
+        self.nodes = []
+        self.edges = []
+    
+    def _create_node(self, operator_type, label, details=None):
+        """Cria um nó no grafo"""
+        node = {
+            'id': self.node_id,
+            'type': operator_type,
+            'label': label,
+            'details': details or {}
+        }
+        self.nodes.append(node)
+        self.node_id += 1
+        return node
+    
+    def _create_edge(self, from_id, to_id):
+        """Cria uma aresta no grafo"""
+        edge = {
+            'from': from_id,
+            'to': to_id
+        }
+        self.edges.append(edge)
+    
+    def build_from_query(self, normalized_query: str, aliases: dict = None) -> dict:
+        """
+        Constrói o grafo de operadores a partir de uma consulta SQL normalizada.
+        
+        Estrutura do grafo (de baixo para cima):
+        1. Folhas: Tabelas (SCAN)
+        2. Meio: Operadores de junção (JOIN) e seleção (SELECT/σ)
+        3. Raiz: Projeção final (PROJECT/π)
+        
+        Args:
+            normalized_query: Query SQL normalizada (lowercase)
+            aliases: Dicionário de aliases de tabelas
+            
+        Returns:
+            dict com nodes e edges do grafo
+        """
+        if aliases is None:
+            aliases = {}
+        
+        q = normalized_query.strip().rstrip(';')
+        
+        # 1. Extrair SELECT list (projeção final)
+        sel_match = re.search(r'^select\s+(.*?)(?=\s+(?:from|where|join)\b|$)', q, re.IGNORECASE)
+        select_list = sel_match.group(1).strip() if sel_match else '*'
+        
+        # 2. Extrair FROM (tabelas base)
+        from_match = re.search(r'from\s+(.+?)(?:\s+where|\s+join|$)', q, re.IGNORECASE)
+        from_section = from_match.group(1).strip() if from_match else ''
+        from_tables = [p.strip() for p in from_section.split(',') if p.strip()]
+        
+        # 3. Extrair JOINs
+        join_pattern = r'\bjoin\s+(\w+)(?:\s+(\w+))?\s+on\s+(.+?)(?=\s+join|\s+where|$)'
+        join_matches = list(re.finditer(join_pattern, q, re.IGNORECASE))
+        
+        # 4. Extrair WHERE
+        where_match = re.search(r'\bwhere\s+(.+?)(?=\s+(?:from|join|group|order|limit)\b|$)', q, re.IGNORECASE)
+        where_clause = where_match.group(1).strip() if where_match else None
+        
+        # ===== CONSTRUÇÃO DO GRAFO (BOTTOM-UP) =====
+        
+        # PASSO 1: Criar nós para as tabelas (folhas)
+        table_nodes = []
+        
+        for table_spec in from_tables:
+            parts = table_spec.split()
+            table_name = parts[0]
+            alias = parts[1] if len(parts) > 1 else None
+            
+            display_name = alias if alias else table_name
+            node = self._create_node(
+                'SCAN',
+                display_name,
+                {'table': table_name, 'alias': alias}
+            )
+            table_nodes.append(node)
+        
+        # PASSO 2: Processar JOINs (criar árvore de junções)
+        current_node = None
+        
+        if len(table_nodes) == 1:
+            # Apenas uma tabela no FROM
+            current_node = table_nodes[0]
+        elif len(table_nodes) > 1:
+            # Múltiplas tabelas no FROM (produto cartesiano)
+            # Encadeamento esquerdo: ((T1 × T2) × T3) ...
+            current_node = table_nodes[0]
+            for i in range(1, len(table_nodes)):
+                cross_node = self._create_node(
+                    'CROSS_PRODUCT',
+                    '×',
+                    {'left': current_node['label'], 'right': table_nodes[i]['label']}
+                )
+                self._create_edge(current_node['id'], cross_node['id'])
+                self._create_edge(table_nodes[i]['id'], cross_node['id'])
+                current_node = cross_node
+        
+        # PASSO 3: Adicionar JOINs sequencialmente
+        for match in join_matches:
+            join_table = match.group(1)
+            join_alias = match.group(2) if match.group(2) else None
+            join_condition = match.group(3).strip()
+            
+            # Criar nó da tabela sendo juntada
+            display_name = join_alias if join_alias else join_table
+            table_node = self._create_node(
+                'SCAN',
+                display_name,
+                {'table': join_table, 'alias': join_alias}
+            )
+            
+            # Criar nó de JOIN
+            formatted_condition = _format_predicate(join_condition)
+            join_node = self._create_node(
+                'JOIN',
+                f'⋈',
+                {'condition': formatted_condition}
+            )
+            
+            # Conectar: resultado anterior e nova tabela → JOIN
+            if current_node:
+                self._create_edge(current_node['id'], join_node['id'])
+            self._create_edge(table_node['id'], join_node['id'])
+            
+            current_node = join_node
+        
+        # PASSO 4: Adicionar WHERE (seleção)
+        if where_clause:
+            formatted_where = _format_predicate(where_clause)
+            select_node = self._create_node(
+                'SELECTION',
+                'σ',
+                {'condition': formatted_where}
+            )
+            if current_node:
+                self._create_edge(current_node['id'], select_node['id'])
+            current_node = select_node
+        
+        # PASSO 5: Adicionar projeção final (raiz)
+        projection_node = self._create_node(
+            'PROJECTION',
+            'π',
+            {'attributes': select_list}
+        )
+        if current_node:
+            self._create_edge(current_node['id'], projection_node['id'])
+        
+        return {
+            'nodes': self.nodes,
+            'edges': self.edges,
+            'root': projection_node['id']
+        }
+
 
 @app.route('/')
 def index():

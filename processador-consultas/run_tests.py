@@ -1,6 +1,7 @@
 import unittest
 from test_h1u import ColoredTextTestRunner, TestSQLValidator, TestMetadata
 from test_h2u import TestRelationalAlgebra
+from test_h3u import TestOperatorGraph
 
 def main():
     loader = unittest.TestLoader()
@@ -12,6 +13,9 @@ def main():
 
     # HU2
     suite.addTests(loader.loadTestsFromTestCase(TestRelationalAlgebra))
+
+    # HU3
+    suite.addTests(loader.loadTestsFromTestCase(TestOperatorGraph))
 
     runner = ColoredTextTestRunner(verbosity=0)
     result = runner.run(suite)
