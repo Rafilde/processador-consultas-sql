@@ -64,15 +64,16 @@ function displayResult(result) {
             detailsHTML += '<p><strong>Conversão para Álgebra Relacional:</strong></p>';
             detailsHTML += `<pre>${escape(result.relational_algebra)}</pre>`;
         }
-        // HU5: Plano de Execução (ordenado)
+        // HU5: Plano de Execução (ordenado) — renderizar como bloco pré-formatado
         if (result.execution_plan && result.execution_plan.length > 0) {
-            detailsHTML += '<p><strong>Plano de Execução (HU5):</strong></p>';
-            detailsHTML += '<ol>';
+            detailsHTML += '<p><strong>Plano de Execução:</strong></p>';
+            // montar texto com uma linha por passo e colocar dentro de <pre> para herdar estilo
+            let planText = '';
             result.execution_plan.forEach(step => {
-                const desc = escape(step.description || `${step.type} (id=${step.id})`);
-                detailsHTML += `<li>${desc}</li>`;
+                const desc = step.description || `${step.type} (id=${step.id})`;
+                planText += `${step.step}. ${desc}\n`;
             });
-            detailsHTML += '</ol>';
+            detailsHTML += `<pre>${escape(planText)}</pre>`;
         }
         
         detailsDiv.innerHTML = detailsHTML;
