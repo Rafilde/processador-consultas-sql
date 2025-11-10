@@ -4,17 +4,17 @@
  * Usa Vis.js para renderizar o grafo
  */
 
-window.renderOperatorGraph = function(graphData) {
+window.renderOperatorGraph = function(graphData, containerId = 'graphContainer') {
     if (!graphData || !graphData.nodes || !graphData.edges) {
         console.error('Dados do grafo inválidos');
         return;
     }
 
     // Criar container para o grafo se não existir
-    let graphContainer = document.getElementById('graphContainer');
+    let graphContainer = document.getElementById(containerId);
     if (!graphContainer) {
         graphContainer = document.createElement('div');
-        graphContainer.id = 'graphContainer';
+        graphContainer.id = containerId;
         graphContainer.className = 'graph-container';
         
         const resultOutput = document.getElementById('resultOutput');

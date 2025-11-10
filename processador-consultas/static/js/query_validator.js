@@ -64,6 +64,16 @@ function displayResult(result) {
             detailsHTML += '<p><strong>Conversão para Álgebra Relacional:</strong></p>';
             detailsHTML += `<pre>${escape(result.relational_algebra)}</pre>`;
         }
+        // HU5: Plano de Execução (ordenado)
+        if (result.execution_plan && result.execution_plan.length > 0) {
+            detailsHTML += '<p><strong>Plano de Execução (HU5):</strong></p>';
+            detailsHTML += '<ol>';
+            result.execution_plan.forEach(step => {
+                const desc = escape(step.description || `${step.type} (id=${step.id})`);
+                detailsHTML += `<li>${desc}</li>`;
+            });
+            detailsHTML += '</ol>';
+        }
         
         detailsDiv.innerHTML = detailsHTML;
         resultOutput.appendChild(detailsDiv);
@@ -77,9 +87,23 @@ function displayResult(result) {
             
             // Renderizar o grafo usando Vis.js
             if (typeof window.renderOperatorGraph === 'function') {
-                window.renderOperatorGraph(result.operator_graph);
+                // usar container nomeado para manter grafo original
+                window.renderOperatorGraph(result.operator_graph, 'graphContainerOriginal');
             } else {
                 graphSection.innerHTML += '<p class="error">Erro: Visualizador de grafo não carregado</p>';
+            }
+        }
+        // HU4: Renderizar Grafo Otimizado
+        if (result.optimized_graph) {
+            const optSection = document.createElement('div');
+            optSection.className = 'graph-section';
+            optSection.innerHTML = '<h3>✨ Grafo Otimizado (HU4)</h3>';
+            resultOutput.appendChild(optSection);
+
+            if (typeof window.renderOperatorGraph === 'function') {
+                window.renderOperatorGraph(result.optimized_graph, 'graphContainerOptimized');
+            } else {
+                optSection.innerHTML += '<p class="error">Erro: Visualizador de grafo não carregado</p>';
             }
         }
         
