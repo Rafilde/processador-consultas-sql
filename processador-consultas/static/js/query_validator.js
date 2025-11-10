@@ -77,9 +77,23 @@ function displayResult(result) {
             
             // Renderizar o grafo usando Vis.js
             if (typeof window.renderOperatorGraph === 'function') {
-                window.renderOperatorGraph(result.operator_graph);
+                // usar container nomeado para manter grafo original
+                window.renderOperatorGraph(result.operator_graph, 'graphContainerOriginal');
             } else {
                 graphSection.innerHTML += '<p class="error">Erro: Visualizador de grafo não carregado</p>';
+            }
+        }
+        // HU4: Renderizar Grafo Otimizado
+        if (result.optimized_graph) {
+            const optSection = document.createElement('div');
+            optSection.className = 'graph-section';
+            optSection.innerHTML = '<h3>✨ Grafo Otimizado (HU4)</h3>';
+            resultOutput.appendChild(optSection);
+
+            if (typeof window.renderOperatorGraph === 'function') {
+                window.renderOperatorGraph(result.optimized_graph, 'graphContainerOptimized');
+            } else {
+                optSection.innerHTML += '<p class="error">Erro: Visualizador de grafo não carregado</p>';
             }
         }
         

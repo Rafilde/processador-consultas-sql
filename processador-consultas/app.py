@@ -4,6 +4,182 @@ import json
 
 app = Flask(__name__)
 
+
+def optimize_operator_graph(graph: dict) -> dict:
+    """Aplica heurísticas simples de otimização (HU4) sobre um grafo de operadores.
+
+    Heurísticas aplicadas:
+    - Push-down de seleções que referenciam uma única tabela (aplicar antes de junções)
+    - Push-down de projeções: inserir projeções próximas aos SCANs para reduzir atributos
+    - Evitar produto cartesiano sempre que possível (não cria novos joins, apenas tenta
+      garantir que seleções/projeções sejam aplicadas antes)
+
+    Observação: este otimizador usa heurísticas estáticas e não estatísticas.
+    """
+    # Cópia defensiva
+    nodes = [dict(n) for n in graph.get('nodes', [])]
+    edges = [dict(e) for e in graph.get('edges', [])]
+
+    id_node = {n['id']: n for n in nodes}
+
+    # Construir mapas de adjacência (direção: child -> parent)
+    parents = {n['id']: [] for n in nodes}
+    children = {n['id']: [] for n in nodes}
+    for e in edges:
+        children[e['from']].append(e['to'])
+        parents[e['to']].append(e['from'])
+
+    def remove_edge(fr, to):
+        nonlocal edges, parents, children
+        edges = [e for e in edges if not (e['from'] == fr and e['to'] == to)]
+        if to in parents and fr in parents[to]:
+            parents[to].remove(fr)
+        if fr in children and to in children[fr]:
+            children[fr].remove(to)
+
+    def add_edge(fr, to):
+        nonlocal edges, parents, children
+        edges.append({'from': fr, 'to': to})
+        if to not in parents:
+            parents[to] = []
+        if fr not in children:
+            children[fr] = []
+        if fr not in parents[to]:
+            parents[to].append(fr)
+        if to not in children[fr]:
+            children[fr].append(to)
+
+    # Helper: extrai tabelas referenciadas de um predicado (padrão alias.col ou table.col)
+    def referenced_tables_from_pred(pred: str):
+        if not pred:
+            return set()
+        toks = re.findall(r"(\w+)\.\w+", pred)
+        return set(toks)
+
+    # 1) Push-down de seleções que referenciam uma única tabela
+    selection_nodes = [n for n in nodes if n['type'] == 'SELECTION']
+    for sel in selection_nodes:
+        sel_id = sel['id']
+        cond = sel['details'].get('condition') if sel['details'] else None
+        refs = referenced_tables_from_pred(cond or '')
+
+        # somente quando a seleção refere-se a uma tabela específica
+        if len(refs) == 1:
+            target_label = list(refs)[0]
+            # encontrar scan correspondente (label pode ser alias ou nome)
+            scan_nodes = [n for n in nodes if n['type'] == 'SCAN' and n['label'] == target_label]
+            if not scan_nodes:
+                # talvez o label seja o nome real da tabela
+                scan_nodes = [n for n in nodes if n['type'] == 'SCAN' and n['details'].get('table') == target_label]
+            if not scan_nodes:
+                continue
+            scan = scan_nodes[0]
+
+            # encontrar o operador que atualmente alimenta a seleção (deveria existir)
+            in_parents = parents.get(sel_id, [])
+            out_children = children.get(sel_id, [])
+            # normalmente há apenas um parent (por exemplo, um JOIN ou CROSS_PRODUCT)
+            if not in_parents:
+                continue
+            current_input = in_parents[0]
+
+            # Se o scan já alimenta diretamente a seleção, nada a fazer
+            if scan['id'] in in_parents:
+                continue
+
+            # Remover ligação atual: current_input -> sel
+            remove_edge(current_input, sel_id)
+
+            # Remover ligação scan -> current_input (vamos inserir sel entre eles)
+            # Só remover se existir explicitamente
+            if scan['id'] in parents.get(current_input, []):
+                remove_edge(scan['id'], current_input)
+
+            # Conectar: scan -> sel -> current_input
+            add_edge(scan['id'], sel_id)
+            add_edge(sel_id, current_input)
+
+            # Rewire: se havia saída da seleção para um pai (ex: PROJECTION), conectar current_input -> that parent
+            for p in out_children:
+                # remover sel -> p e adicionar current_input -> p (já foi sel->p removido ao remover edge?)
+                remove_edge(sel_id, p)
+                # evitar duplicar arestas
+                if current_input not in parents.get(p, []):
+                    add_edge(current_input, p)
+
+    # 2) Push-down de projeções: para cada PROJECTION raiz, tentar inserir projeções locais nos SCANs
+    projection_nodes = [n for n in nodes if n['type'] == 'PROJECTION']
+    # identificar raiz projection (por id=graph['root'])
+    root_id = graph.get('root')
+    root_proj = next((n for n in projection_nodes if n['id'] == root_id), None)
+    if root_proj and root_proj['details']:
+        # atributos solicitados na projeção final
+        attrs_raw = root_proj['details'].get('attributes', '')
+        try:
+            proj_attrs = [a.strip() for a in re.split(r',', attrs_raw) if a.strip()]
+        except Exception:
+            proj_attrs = []
+
+        # coletar atributos necessários para junções (para não projetar fora atributos de join)
+        join_nodes = [n for n in nodes if n['type'] in ('JOIN', 'CROSS_PRODUCT')]
+        join_needed = {}
+        for j in join_nodes:
+            cond = j['details'].get('condition') if j['details'] else ''
+            refs = re.findall(r"(\w+)\.(\w+)", cond or '')
+            for table, col in refs:
+                join_needed.setdefault(table, set()).add(col)
+
+        # Para cada SCAN, criar projeção local contendo os atributos necessários
+        for scan in [n for n in nodes if n['type'] == 'SCAN']:
+            label = scan['label']
+            # atributos do root_proj que pertencem a este scan
+            local_attrs = []
+            for a in proj_attrs:
+                m = re.match(r"(\w+)\.(\w+)$", a)
+                if m and m.group(1) == label:
+                    local_attrs.append(a)
+
+            # incluir atributos necessários para join
+            needed = join_needed.get(label, set())
+            for col in needed:
+                qual = f"{label}.{col}"
+                if qual not in local_attrs:
+                    local_attrs.append(qual)
+
+            # Se houver atributos locais a projetar e não for *
+            if local_attrs and not (len(proj_attrs) == 1 and proj_attrs[0] == '*'):
+                # criar nó de projeção local
+                new_proj = {
+                    'id': max(id_node.keys()) + 1,
+                    'type': 'PROJECTION',
+                    'label': 'π',
+                    'details': {'attributes': ','.join(local_attrs)}
+                }
+                # atualizar mapas
+                nodes.append(new_proj)
+                id_node[new_proj['id']] = new_proj
+                parents[new_proj['id']] = []
+                children[new_proj['id']] = []
+
+                # reconectar: todas as arestas scan -> X passam a ser new_proj -> X
+                out_edges = list(children.get(scan['id'], []))
+                for dest in out_edges:
+                    # remover scan->dest
+                    remove_edge(scan['id'], dest)
+                    # adicionar new_proj->dest
+                    add_edge(new_proj['id'], dest)
+
+                # adicionar scan->new_proj
+                add_edge(scan['id'], new_proj['id'])
+
+    # Recomputar estrutura final e identificar novo root (manter mesmo root se possível)
+    optimized = {
+        'nodes': nodes,
+        'edges': edges,
+        'root': graph.get('root')
+    }
+    return optimized
+
 METADATA = {
     'categoria': ['idcategoria', 'descricao'],
     'produto': ['idproduto', 'nome', 'descricao', 'preco', 'quantestoque', 'categoria_idcategoria'],
@@ -394,6 +570,11 @@ class SQLValidator:
                     normalized_query,
                     aliases=self.table_aliases
                 )
+                # HU4 – Otimização do grafo (heurísticas)
+                try:
+                    result['optimized_graph'] = optimize_operator_graph(result['operator_graph'])
+                except Exception:
+                    result['optimized_graph'] = None
             except Exception:
                 # Em caso de erro inesperado na construção do grafo, não bloquear
                 result['operator_graph'] = None
@@ -694,6 +875,7 @@ class OperatorGraph:
             'root': projection_node['id']
         }
 
+    
 
 @app.route('/')
 def index():
