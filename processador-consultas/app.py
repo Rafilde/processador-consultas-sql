@@ -180,6 +180,77 @@ def optimize_operator_graph(graph: dict) -> dict:
     }
     return optimized
 
+
+def generate_execution_plan(graph: dict) -> list:
+    """Gera um plano de execução ordenado a partir do grafo otimizado.
+
+    A ordem é uma ordenação topológica dos nós do grafo (execução de baixo para cima):
+    se existe aresta u->v, u deve ser executado antes de v.
+    Retorna uma lista de passos com descrições legíveis.
+    """
+    if not graph or 'nodes' not in graph or 'edges' not in graph:
+        return []
+
+    nodes = {n['id']: n for n in graph['nodes']}
+    edges = list(graph['edges'])
+
+    # calcular in-degree (número de pais) para cada nó
+    in_deg = {nid: 0 for nid in nodes}
+    children = {nid: [] for nid in nodes}
+    for e in edges:
+        # e: from -> to
+        if e['to'] in in_deg:
+            in_deg[e['to']] += 1
+        if e['from'] in children:
+            children[e['from']].append(e['to'])
+
+    # Kahn's algorithm para topo sort (nodes com in_deg 0 primeiro)
+    queue = [nid for nid, deg in in_deg.items() if deg == 0]
+    ordered = []
+    while queue:
+        nid = queue.pop(0)
+        ordered.append(nid)
+        for ch in children.get(nid, []):
+            in_deg[ch] -= 1
+            if in_deg[ch] == 0:
+                queue.append(ch)
+
+    # Se houver ciclo ou nós não processados, inclua-os no final
+    remaining = [nid for nid in nodes if nid not in ordered]
+    ordered.extend(remaining)
+
+    # Converter em passos legíveis
+    steps = []
+    step_no = 1
+    for nid in ordered:
+        n = nodes[nid]
+        desc = ''
+        t = n.get('type')
+        if t == 'SCAN':
+            table = n.get('details', {}).get('table')
+            alias = n.get('details', {}).get('alias')
+            desc = f"SCAN tabela={table}" + (f" (alias={alias})" if alias else '')
+        elif t == 'SELECTION':
+            cond = n.get('details', {}).get('condition')
+            desc = f"SELECTION cond={cond}"
+        elif t == 'PROJECTION':
+            attrs = n.get('details', {}).get('attributes')
+            desc = f"PROJECTION attrs={attrs}"
+        elif t == 'JOIN':
+            cond = n.get('details', {}).get('condition')
+            desc = f"JOIN cond={cond}"
+        elif t == 'CROSS_PRODUCT':
+            left = n.get('details', {}).get('left')
+            right = n.get('details', {}).get('right')
+            desc = f"CROSS_PRODUCT {left} × {right}"
+        else:
+            desc = f"{t}"
+
+        steps.append({'step': step_no, 'id': nid, 'type': t, 'description': desc})
+        step_no += 1
+
+    return steps
+
 METADATA = {
     'categoria': ['idcategoria', 'descricao'],
     'produto': ['idproduto', 'nome', 'descricao', 'preco', 'quantestoque', 'categoria_idcategoria'],
@@ -575,6 +646,12 @@ class SQLValidator:
                     result['optimized_graph'] = optimize_operator_graph(result['operator_graph'])
                 except Exception:
                     result['optimized_graph'] = None
+                # HU5 - Plano de Execução baseado no grafo otimizado (ou no grafo original se otimizado ausente)
+                try:
+                    plan_graph = result.get('optimized_graph') or result.get('operator_graph')
+                    result['execution_plan'] = generate_execution_plan(plan_graph) if plan_graph else []
+                except Exception:
+                    result['execution_plan'] = []
             except Exception:
                 # Em caso de erro inesperado na construção do grafo, não bloquear
                 result['operator_graph'] = None

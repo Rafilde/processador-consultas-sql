@@ -64,6 +64,16 @@ function displayResult(result) {
             detailsHTML += '<p><strong>Conversão para Álgebra Relacional:</strong></p>';
             detailsHTML += `<pre>${escape(result.relational_algebra)}</pre>`;
         }
+        // HU5: Plano de Execução (ordenado)
+        if (result.execution_plan && result.execution_plan.length > 0) {
+            detailsHTML += '<p><strong>Plano de Execução (HU5):</strong></p>';
+            detailsHTML += '<ol>';
+            result.execution_plan.forEach(step => {
+                const desc = escape(step.description || `${step.type} (id=${step.id})`);
+                detailsHTML += `<li>${desc}</li>`;
+            });
+            detailsHTML += '</ol>';
+        }
         
         detailsDiv.innerHTML = detailsHTML;
         resultOutput.appendChild(detailsDiv);
